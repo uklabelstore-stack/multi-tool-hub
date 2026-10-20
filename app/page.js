@@ -1,4 +1,7 @@
 import tools from '@/data/tools';
+import ToolGrid from '@/components/ToolGrid';
+
+const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort();
 
 const jsonLd = {
   '@context': 'https://schema.org',
