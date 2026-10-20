@@ -16,15 +16,22 @@ export async function generateMetadata({ params }) {
     return {
       title: 'Tool not found',
       description: 'The requested tool could not be found.',
+      alternates: {
+        canonical: '/tools/not-found',
+      },
     };
   }
 
   return {
     title: `${tool.title} - Multi-Tool Hub`,
     description: tool.desc,
+    alternates: {
+      canonical: `/tools/${tool.slug}`,
+    },
     openGraph: {
       title: `${tool.title} - Multi-Tool Hub`,
       description: tool.desc,
+      url: `https://www.ai90s.site/tools/${tool.slug}`,
     },
   };
 }

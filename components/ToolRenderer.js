@@ -2,1423 +2,1323 @@
 
 import { useEffect, useRef } from 'react';
 
+const toTitle = (value) =>
+  value
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const safeNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const textFrom = (selector) => {
+  const el = document.querySelector(selector);
+  return el ? el.value || '' : '';
+};
+
+const setResult = (selector, value) => {
+  const el = document.querySelector(selector);
+  if (el) el.textContent = value;
+};
+
+const bindAction = (buttonId, handler) => {
+  const button = document.getElementById(buttonId);
+  if (!button) return undefined;
+  const action = () => handler();
+  button.addEventListener('click', action);
+  return () => button.removeEventListener('click', action);
+};
+
+const bindClear = (buttonId, fields) => {
+  const button = document.getElementById(buttonId);
+  if (!button) return undefined;
+  const action = () => {
+    fields.forEach(({ selector, type = 'value' }) => {
+      const el = document.querySelector(selector);
+      if (!el) return;
+      if (type === 'innerHTML') {
+        el.innerHTML = '';
+      } else {
+        el.value = '';
+      }
+    });
+  };
+  button.addEventListener('click', action);
+  return () => button.removeEventListener('click', action);
+};
+
 export default function ToolRenderer({ slug, html }) {
   const containerRef = useRef(null);
 
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[data-src="${src}"]`);
-      if (existing) {
-        if (existing.getAttribute('data-loaded') === 'true') return resolve();
-        existing.addEventListener('load', () => resolve());
-        existing.addEventListener('error', () => reject(new Error('Script load error')));
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = src;
-      script.async = true;
-      script.setAttribute('data-src', src);
-      script.addEventListener('load', () => {
-        script.setAttribute('data-loaded', 'true');
-        resolve();
-      });
-      script.addEventListener('error', () => reject(new Error('Script load error')));
-      document.head.appendChild(script);
-    });
-  }
-
   useEffect(() => {
     if (!containerRef.current) return;
-    containerRef.current.innerHTML = html;
 
-    // Generic text tools
-    if (slug === 'word-counter') {
-      const input = containerRef.current.querySelector('#word-counter-input');
-      const words = containerRef.current.querySelector('#word-counter-words');
-      const chars = containerRef.current.querySelector('#word-counter-chars');
-      const lines = containerRef.current.querySelector('#word-counter-lines');
+    const cleanup = [];
 
+    const addCleanup = (fn) => {
+      if (fn) cleanup.push(fn);
+    };
+
+    const applyTextCounter = (inputId, wordId, charId, lineId) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
       const update = () => {
-        const value = input.value;
-        const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
-        words.textContent = String(wordCount);
-        chars.textContent = String(value.length);
-        lines.textContent = String(value.split(/\n/).filter(Boolean).length || 0);
+        const value = input.value || '';
+        const words = value.trim() ? value.trim().split(/\s+/).length : 0;
+        const chars = value.length;
+        const lines = value.split(/\r?\n/).filter((line) => line.trim() !== '').length;
+        setResult(`#${wordId}`, String(words));
+        setResult(`#${charId}`, String(chars));
+        setResult(`#${lineId}`, String(lines));
       };
-
       input.addEventListener('input', update);
+      addCleanup(() => input.removeEventListener('input', update));
       update();
-      return () => input.removeEventListener('input', update);
-    }
+    };
 
-    if (slug === 'case-converter') {
-      const input = containerRef.current.querySelector('#case-converter-input');
-      const output = containerRef.current.querySelector('#case-converter-output');
-      const upper = containerRef.current.querySelector('#case-upper');
-      const lower = containerRef.current.querySelector('#case-lower');
-      const title = containerRef.current.querySelector('#case-title');
-      const clear = containerRef.current.querySelector('#case-clear');
-
-      const toTitle = (value) =>
-        value
-          .toLowerCase()
-          .split(' ')
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-
-      upper.addEventListener('click', () => (output.value = input.value.toUpperCase()));
-      lower.addEventListener('click', () => (output.value = input.value.toLowerCase()));
-      title.addEventListener('click', () => (output.value = toTitle(input.value)));
-      clear.addEventListener('click', () => {
-        input.value = '';
-        output.value = '';
-      });
-
-      return () => {
-        upper.removeEventListener('click', () => {});
-        lower.removeEventListener('click', () => {});
-        title.removeEventListener('click', () => {});
-        clear.removeEventListener('click', () => {});
-      };
-    }
-
-    if (slug === 'bmi-calculator') {
-      const weight = containerRef.current.querySelector('#bmi-weight');
-      const height = containerRef.current.querySelector('#bmi-height');
-      const btn = containerRef.current.querySelector('#bmi-calc');
-      const out = containerRef.current.querySelector('#bmi-result');
-
-      const calc = () => {
-        const w = Number(weight.value);
-        const h = Number(height.value) / 100;
-        if (!w || !h) {
-          out.textContent = 'Enter weight and height';
-          return;
+    switch (slug) {
+      case 'word-counter':
+        applyTextCounter('word-counter-input', 'word-counter-words', 'word-counter-chars', 'word-counter-lines');
+        break;
+      case 'case-converter': {
+        const input = document.getElementById('case-converter-input');
+        const output = document.getElementById('case-converter-output');
+        const toTitleCase = (value) =>
+          value
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        if (input && output) {
+          const setUpper = () => {
+            output.value = input.value.toUpperCase();
+          };
+          const setLower = () => {
+            output.value = input.value.toLowerCase();
+          };
+          const setTitle = () => {
+            output.value = toTitleCase(input.value);
+          };
+          const clear = () => {
+            input.value = '';
+            output.value = '';
+          };
+          document.getElementById('case-upper')?.addEventListener('click', setUpper);
+          document.getElementById('case-lower')?.addEventListener('click', setLower);
+          document.getElementById('case-title')?.addEventListener('click', setTitle);
+          document.getElementById('case-clear')?.addEventListener('click', clear);
+          addCleanup(() => {
+            document.getElementById('case-upper')?.removeEventListener('click', setUpper);
+            document.getElementById('case-lower')?.removeEventListener('click', setLower);
+            document.getElementById('case-title')?.removeEventListener('click', setTitle);
+            document.getElementById('case-clear')?.removeEventListener('click', clear);
+          });
         }
-        const bmi = w / (h * h);
-        const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
-        out.textContent = `${bmi.toFixed(1)} (${label})`;
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'age-calculator') {
-      const dob = containerRef.current.querySelector('#age-dob');
-      const btn = containerRef.current.querySelector('#age-calc');
-      const out = containerRef.current.querySelector('#age-result');
-
-      const calc = () => {
-        if (!dob.value) {
-          out.textContent = 'Pick a date';
-          return;
-        }
-
-        const birth = new Date(dob.value);
-        const today = new Date();
-        let years = today.getFullYear() - birth.getFullYear();
-        let months = today.getMonth() - birth.getMonth();
-        let days = today.getDate() - birth.getDate();
-
-        if (days < 0) {
-          months -= 1;
-          const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-          days += lastMonth.getDate();
-        }
-
-        if (months < 0) {
-          years -= 1;
-          months += 12;
-        }
-
-        out.textContent = `Your age: ${years} years, ${months} months, ${days} days`;
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'kg-to-lbs') {
-      const input = containerRef.current.querySelector('#kg-input');
-      const btn = containerRef.current.querySelector('#kg-convert');
-      const out = containerRef.current.querySelector('#kg-result');
-
-      const convert = () => {
-        const kg = Number(input.value);
-        if (!Number.isFinite(kg)) {
-          out.textContent = 'Enter valid value';
-          return;
-        }
-        out.textContent = `${(kg * 2.20462).toFixed(2)} lbs`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'password-generator') {
-      const length = containerRef.current.querySelector('#pwd-length');
-      const output = containerRef.current.querySelector('#pwd-output');
-      const generate = containerRef.current.querySelector('#pwd-generate');
-      const copy = containerRef.current.querySelector('#pwd-copy');
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
-
-      const makePassword = () => {
-        const value = Math.max(4, Math.min(64, Number(length.value) || 16));
-        let result = '';
-        for (let i = 0; i < value; i++) {
-          result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        output.value = result;
-      };
-
-      const handleCopy = async () => {
-        if (!output.value) return;
-        await navigator.clipboard.writeText(output.value);
-        copy.textContent = 'Copied';
-        setTimeout(() => (copy.textContent = 'Copy'), 1200);
-      };
-
-      generate.addEventListener('click', makePassword);
-      copy.addEventListener('click', handleCopy);
-      makePassword();
-      return () => {
-        generate.removeEventListener('click', makePassword);
-        copy.removeEventListener('click', handleCopy);
-      };
-    }
-
-    if (slug === 'qr-code-generator') {
-      const input = containerRef.current.querySelector('#qr-input');
-      const btn = containerRef.current.querySelector('#qr-generate');
-      const clear = containerRef.current.querySelector('#qr-clear');
-      const out = containerRef.current.querySelector('#qr-output');
-
-      const generate = () => {
-        const val = input.value.trim();
-        if (!val) {
-          out.innerHTML = '<div class="text-sm text-slate-500">Enter text or URL to generate a QR code.</div>';
-          return;
-        }
-        const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(val)}`;
-        out.innerHTML = `<img src="${url}" alt="QR code" class="h-48 w-48 border border-slate-200 bg-white p-2" />`;
-      };
-
-      btn.addEventListener('click', generate);
-      clear.addEventListener('click', () => {
-        input.value = '';
-        out.innerHTML = '';
-      });
-      return () => {
-        btn.removeEventListener('click', generate);
-        clear.removeEventListener('click', () => {});
-      };
-    }
-
-    if (slug === 'base64') {
-      const input = containerRef.current.querySelector('#b64-input');
-      const encodeBtn = containerRef.current.querySelector('#b64-encode');
-      const decodeBtn = containerRef.current.querySelector('#b64-decode');
-      const output = containerRef.current.querySelector('#b64-output');
-
-      const encode = () => {
-        try {
-          output.value = btoa(unescape(encodeURIComponent(input.value || '')));
-        } catch {
-          output.value = 'Encoding error';
-        }
-      };
-
-      const decode = () => {
-        try {
-          output.value = decodeURIComponent(escape(atob(input.value || '')));
-        } catch {
-          output.value = 'Decoding error';
-        }
-      };
-
-      encodeBtn.addEventListener('click', encode);
-      decodeBtn.addEventListener('click', decode);
-      return () => {
-        encodeBtn.removeEventListener('click', encode);
-        decodeBtn.removeEventListener('click', decode);
-      };
-    }
-
-    if (slug === 'percentage-calculator') {
-      const base = containerRef.current.querySelector('#pct-base');
-      const percent = containerRef.current.querySelector('#pct-percent');
-      const btn = containerRef.current.querySelector('#pct-calc');
-      const out = containerRef.current.querySelector('#pct-result');
-
-      const calc = () => {
-        const b = Number(base.value);
-        const p = Number(percent.value);
-        if (!Number.isFinite(b) || !Number.isFinite(p)) {
-          out.textContent = 'Enter valid numbers';
-          return;
-        }
-        out.textContent = `${((b * p) / 100).toFixed(2)}`;
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'lorem-ipsum') {
-      const count = containerRef.current.querySelector('#lorem-count');
-      const btn = containerRef.current.querySelector('#lorem-gen');
-      const out = containerRef.current.querySelector('#lorem-output');
-      const sample = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent blandit lorem vitae sapien varius, at blandit nibh tincidunt.';
-
-      const generate = () => {
-        const n = Math.max(1, Math.min(10, Number(count.value) || 3));
-        out.innerHTML = Array.from({ length: n }, () => `<p class="mb-2 text-sm text-slate-700">${sample}</p>`).join('');
-      };
-
-      btn.addEventListener('click', generate);
-      generate();
-      return () => btn.removeEventListener('click', generate);
-    }
-
-    // PDF & Image tools
-    const loadPdfJs = async () => {
-      const pdfJsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
-      const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-      await loadScript(pdfJsUrl);
-      if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+        break;
       }
-    };
-
-    const loadPdfLib = async () => {
-      await loadScript('https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js');
-    };
-
-    if (slug === 'pdf-to-text') {
-      const input = containerRef.current.querySelector('#pdf2txt-file');
-      const btn = containerRef.current.querySelector('#pdf2txt-extract');
-      const clear = containerRef.current.querySelector('#pdf2txt-clear');
-      const out = containerRef.current.querySelector('#pdf2txt-output');
-      const status = containerRef.current.querySelector('#pdf2txt-status');
-
-      const extract = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select a PDF file first.';
-          return;
-        }
-        try {
-          await loadPdfJs();
-          const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-          let text = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            text += content.items.map((item) => item.str).join(' ') + '\n\n';
+      case 'bmi-calculator':
+        addCleanup(
+          bindAction('bmi-calc', () => {
+            const weight = safeNumber(document.getElementById('bmi-weight')?.value, NaN);
+            const heightCm = safeNumber(document.getElementById('bmi-height')?.value, NaN);
+            const result = document.getElementById('bmi-result');
+            if (!result || Number.isNaN(weight) || Number.isNaN(heightCm) || heightCm <= 0) {
+              result.textContent = 'Enter valid values';
+              return;
+            }
+            const bmi = weight / ((heightCm / 100) ** 2);
+            const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
+            result.textContent = `${bmi.toFixed(1)} (${label})`;
+          }),
+        );
+        break;
+      case 'age-calculator':
+        addCleanup(
+          bindAction('age-calc', () => {
+            const dobInput = document.getElementById('age-dob');
+            const result = document.getElementById('age-result');
+            if (!dobInput || !result) return;
+            const birth = new Date(dobInput.value);
+            if (Number.isNaN(birth.getTime())) {
+              result.textContent = 'Pick a valid date';
+              return;
+            }
+            const today = new Date();
+            let ageYears = today.getFullYear() - birth.getFullYear();
+            let ageMonths = today.getMonth() - birth.getMonth();
+            let ageDays = today.getDate() - birth.getDate();
+            if (ageDays < 0) {
+              ageMonths -= 1;
+              const prevMonthDate = new Date(today.getFullYear(), today.getMonth(), 0);
+              ageDays += prevMonthDate.getDate();
+            }
+            if (ageMonths < 0) {
+              ageYears -= 1;
+              ageMonths += 12;
+            }
+            result.textContent = `Your age: ${ageYears} years, ${ageMonths} months, ${ageDays} days`;
+          }),
+        );
+        break;
+      case 'kg-to-lbs':
+        addCleanup(
+          bindAction('kg-convert', () => {
+            const input = document.getElementById('kg-input');
+            const result = document.getElementById('kg-result');
+            if (!input || !result) return;
+            const kg = Number(input.value);
+            result.textContent = Number.isFinite(kg) ? `${(kg * 2.20462).toFixed(2)} lbs` : 'Enter a valid value';
+          }),
+        );
+        break;
+      case 'password-generator': {
+        const lengthInput = document.getElementById('pwd-length');
+        const output = document.getElementById('pwd-output');
+        const generate = () => {
+          const length = clamp(Number(lengthInput?.value || 16), 4, 64);
+          const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+          let result = '';
+          for (let i = 0; i < length; i += 1) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
           }
-          out.value = text.trim();
-          status.textContent = 'PDF text extracted successfully.';
-        } catch (error) {
-          status.textContent = 'Could not extract text from PDF.';
-          console.error(error);
-        }
-      };
-
-      btn.addEventListener('click', extract);
-      clear.addEventListener('click', () => {
-        input.value = '';
-        out.value = '';
-        status.textContent = '';
-      });
-      return () => {
-        btn.removeEventListener('click', extract);
-        clear.removeEventListener('click', () => {});
-      };
-    }
-
-    if (slug === 'pdf-page-count') {
-      const input = containerRef.current.querySelector('#pdf-pagecount-file');
-      const btn = containerRef.current.querySelector('#pdf-pagecount-btn');
-      const out = containerRef.current.querySelector('#pdf-pagecount-result');
-      const status = containerRef.current.querySelector('#pdf-pagecount-status');
-
-      const count = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select a PDF file.';
-          return;
-        }
-        try {
-          await loadPdfJs();
-          const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-          out.textContent = String(pdf.numPages);
-          status.textContent = 'Page count loaded.';
-        } catch (error) {
-          status.textContent = 'Could not read PDF.';
-        }
-      };
-
-      btn.addEventListener('click', count);
-      return () => btn.removeEventListener('click', count);
-    }
-
-    if (slug === 'pdf-preview') {
-      const input = containerRef.current.querySelector('#pdf-preview-file');
-      const btn = containerRef.current.querySelector('#pdf-preview-btn');
-      const canvasWrap = containerRef.current.querySelector('#pdf-preview-canvas');
-      const status = containerRef.current.querySelector('#pdf-preview-status');
-
-      const preview = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select a PDF file.';
-          return;
-        }
-        try {
-          await loadPdfJs();
-          const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-          const page = await pdf.getPage(1);
-          const viewport = page.getViewport({ scale: 1.2 });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext('2d');
-          await page.render({ canvasContext: ctx, viewport }).promise;
-          canvasWrap.innerHTML = '';
-          canvasWrap.appendChild(canvas);
-          status.textContent = 'Preview ready.';
-        } catch (error) {
-          status.textContent = 'Could not preview PDF.';
-          console.error(error);
-        }
-      };
-
-      btn.addEventListener('click', preview);
-      return () => btn.removeEventListener('click', preview);
-    }
-
-    if (slug === 'pdf-merge') {
-      const input = containerRef.current.querySelector('#pdf-merge-files');
-      const btn = containerRef.current.querySelector('#pdf-merge-btn');
-      const download = containerRef.current.querySelector('#pdf-merge-download');
-      const status = containerRef.current.querySelector('#pdf-merge-status');
-
-      const merge = async () => {
-        const files = Array.from(input.files || []);
-        if (files.length < 2) {
-          status.textContent = 'Select at least two PDF files.';
-          return;
-        }
-        try {
-          await loadPdfLib();
-          const { PDFDocument } = window.PDFLib;
-          const merged = await PDFDocument.create();
-          for (const file of files) {
-            const src = await PDFDocument.load(await file.arrayBuffer());
-            const pages = await merged.copyPages(src, src.getPageIndices());
-            pages.forEach((page) => merged.addPage(page));
-          }
-          const bytes = await merged.save();
-          const blob = new Blob([bytes], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          download.href = url;
-          download.classList.remove('hidden');
-          status.textContent = 'Merged PDF ready.';
-        } catch (error) {
-          status.textContent = 'Could not merge PDFs.';
-          console.error(error);
-        }
-      };
-
-      btn.addEventListener('click', merge);
-      return () => btn.removeEventListener('click', merge);
-    }
-
-    if (slug === 'pdf-split') {
-      const input = containerRef.current.querySelector('#pdf-split-file');
-      const btn = containerRef.current.querySelector('#pdf-split-btn');
-      const out = containerRef.current.querySelector('#pdf-split-links');
-      const status = containerRef.current.querySelector('#pdf-split-status');
-
-      const split = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select a PDF file.';
-          return;
-        }
-        try {
-          await loadPdfLib();
-          const { PDFDocument } = window.PDFLib;
-          const src = await PDFDocument.load(await file.arrayBuffer());
-          out.innerHTML = '';
-          for (let i = 0; i < src.getPageCount(); i++) {
-            const newDoc = await PDFDocument.create();
-            const [page] = await newDoc.copyPages(src, [i]);
-            newDoc.addPage(page);
-            const bytes = await newDoc.save();
-            const blob = new Blob([bytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `page-${i + 1}.pdf`;
-            link.textContent = `Download page ${i + 1}`;
-            link.className = 'block text-sm text-blue-600 hover:underline';
-            out.appendChild(link);
-          }
-          status.textContent = 'Pages ready to download.';
-        } catch (error) {
-          status.textContent = 'Could not split PDF.';
-          console.error(error);
-        }
-      };
-
-      btn.addEventListener('click', split);
-      return () => btn.removeEventListener('click', split);
-    }
-
-    if (slug === 'image-resizer') {
-      const input = containerRef.current.querySelector('#img-resize-file');
-      const width = containerRef.current.querySelector('#img-resize-width');
-      const height = containerRef.current.querySelector('#img-resize-height');
-      const btn = containerRef.current.querySelector('#img-resize-btn');
-      const download = containerRef.current.querySelector('#img-resize-download');
-      const status = containerRef.current.querySelector('#img-resize-status');
-
-      const resize = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select an image first.';
-          return;
-        }
-
-        const img = await createImageBitmap(file);
-        const targetW = Number(width.value) || img.width;
-        const targetH = Number(height.value) || img.height;
-        const canvas = document.createElement('canvas');
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, targetW, targetH);
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          download.href = url;
-          download.classList.remove('hidden');
-          status.textContent = 'Image resized.';
-        }, 'image/png');
-      };
-
-      btn.addEventListener('click', resize);
-      return () => btn.removeEventListener('click', resize);
-    }
-
-    if (slug === 'image-to-base64') {
-      const input = containerRef.current.querySelector('#img2b64-file');
-      const btn = containerRef.current.querySelector('#img2b64-btn');
-      const out = containerRef.current.querySelector('#img2b64-output');
-      const status = containerRef.current.querySelector('#img2b64-status');
-
-      const convert = () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select an image.';
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          out.value = String(reader.result);
-          status.textContent = 'Base64 generated.';
+          if (output) output.value = result;
         };
-        reader.readAsDataURL(file);
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'base64-to-image') {
-      const input = containerRef.current.querySelector('#b642img-input');
-      const btn = containerRef.current.querySelector('#b642img-btn');
-      const out = containerRef.current.querySelector('#b642img-output');
-      const download = containerRef.current.querySelector('#b642img-download');
-
-      const preview = () => {
-        const value = input.value.trim();
-        if (!value) return;
-        const data = value.startsWith('data:') ? value : `data:image/png;base64,${value}`;
-        const img = document.createElement('img');
-        img.src = data;
-        img.className = 'max-w-full rounded border border-slate-200 bg-white';
-        out.innerHTML = '';
-        out.appendChild(img);
-        download.href = data;
-        download.classList.remove('hidden');
-      };
-
-      btn.addEventListener('click', preview);
-      return () => btn.removeEventListener('click', preview);
-    }
-
-    if (slug === 'image-compressor') {
-      const input = containerRef.current.querySelector('#img-compress-file');
-      const quality = containerRef.current.querySelector('#img-compress-quality');
-      const qVal = containerRef.current.querySelector('#img-compress-qval');
-      const btn = containerRef.current.querySelector('#img-compress-btn');
-      const download = containerRef.current.querySelector('#img-compress-download');
-      const status = containerRef.current.querySelector('#img-compress-status');
-
-      const updateLabel = () => {
-        qVal.textContent = Number(quality.value).toFixed(2);
-      };
-
-      quality.addEventListener('input', updateLabel);
-      updateLabel();
-
-      const compress = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select an image to compress.';
-          return;
+        addCleanup(bindAction('pwd-generate', generate));
+        addCleanup(bindAction('pwd-copy', async () => {
+          if (!output || !output.value) return;
+          await navigator.clipboard.writeText(output.value);
+        }));
+        generate();
+        break;
+      }
+      case 'qr-code-generator':
+        addCleanup(
+          bindAction('qr-generate', () => {
+            const input = document.getElementById('qr-input');
+            const output = document.getElementById('qr-output');
+            if (!input || !output) return;
+            const value = input.value.trim();
+            if (!value) {
+              output.innerHTML = '<div class="text-sm text-slate-500">Enter text or URL to generate a QR code.</div>';
+              return;
+            }
+            const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(value)}`;
+            output.innerHTML = `<img src="${url}" alt="QR code" class="h-48 w-48 rounded border border-slate-200 bg-white p-2" />`;
+          }),
+        );
+        addCleanup(
+          bindAction('qr-clear', () => {
+            const input = document.getElementById('qr-input');
+            const output = document.getElementById('qr-output');
+            if (input) input.value = '';
+            if (output) output.innerHTML = '';
+          }),
+        );
+        break;
+      case 'base64': {
+        const input = document.getElementById('b64-input');
+        const output = document.getElementById('b64-output');
+        if (input && output) {
+          const encode = () => {
+            try {
+              output.value = btoa(unescape(encodeURIComponent(input.value || '')));
+            } catch {
+              output.value = 'Encoding error';
+            }
+          };
+          const decode = () => {
+            try {
+              output.value = decodeURIComponent(escape(atob(input.value || '')));
+            } catch {
+              output.value = 'Decoding error';
+            }
+          };
+          document.getElementById('b64-encode')?.addEventListener('click', encode);
+          document.getElementById('b64-decode')?.addEventListener('click', decode);
+          addCleanup(() => {
+            document.getElementById('b64-encode')?.removeEventListener('click', encode);
+            document.getElementById('b64-decode')?.removeEventListener('click', decode);
+          });
         }
-
-        const img = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          download.href = url;
-          download.classList.remove('hidden');
-          status.textContent = 'Compression complete.';
-        }, 'image/jpeg', Number(quality.value));
-      };
-
-      btn.addEventListener('click', compress);
-      return () => {
-        btn.removeEventListener('click', compress);
-        quality.removeEventListener('input', updateLabel);
-      };
+        break;
+      }
+      case 'percentage-calculator':
+        addCleanup(
+          bindAction('pct-calc', () => {
+            const base = Number(document.getElementById('pct-base')?.value || 0);
+            const percent = Number(document.getElementById('pct-percent')?.value || 0);
+            const result = document.getElementById('pct-result');
+            if (!result) return;
+            result.textContent = `${((base * percent) / 100).toFixed(2)}`;
+          }),
+        );
+        break;
+      case 'lorem-ipsum':
+        addCleanup(
+          bindAction('lorem-gen', () => {
+            const count = Math.max(1, Math.min(10, Number(document.getElementById('lorem-count')?.value || 3)));
+            const filler = [
+              'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+              'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+              'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+              'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+            ];
+            const output = document.getElementById('lorem-output');
+            if (!output) return;
+            output.innerHTML = Array.from({ length: count }, (_, index) => `<p class="mb-3 text-sm text-slate-600">${filler[index % filler.length]}</p>`).join('');
+          }),
+        );
+        break;
+      case 'text-summary':
+        addCleanup(
+          bindAction('text-summary-action', () => {
+            const value = textFrom('#text-summary-input');
+            const words = value.trim() ? value.trim().split(/\s+/).length : 0;
+            const sentences = value.split(/[.!?]+/).filter(Boolean).length;
+            const paragraphs = value.split(/\n{2,}/).filter(Boolean).length || 1;
+            const summary = `Words: ${words}\nSentences: ${sentences}\nParagraphs: ${paragraphs}\nLength: ${value.length} chars`;
+            setResult('#text-summary-result', summary);
+          }),
+        );
+        addCleanup(bindClear('text-summary-clear', [{ selector: '#text-summary-input' }, { selector: '#text-summary-result', type: 'innerHTML' }]));
+        break;
+      case 'character-counter':
+        addCleanup(
+          bindAction('character-counter-action', () => {
+            const value = textFrom('#character-counter-input');
+            const stats = {
+              chars: value.length,
+              charsNoSpaces: value.replace(/\s/g, '').length,
+              words: value.trim() ? value.trim().split(/\s+/).length : 0,
+              spaces: (value.match(/\s/g) || []).length,
+            };
+            setResult('#character-counter-result', `Characters: ${stats.chars}\nNo spaces: ${stats.charsNoSpaces}\nWords: ${stats.words}\nSpaces: ${stats.spaces}`);
+          }),
+        );
+        addCleanup(bindClear('character-counter-clear', [{ selector: '#character-counter-input' }, { selector: '#character-counter-result', type: 'innerHTML' }]));
+        break;
+      case 'reverse-text':
+        addCleanup(
+          bindAction('reverse-text-action', () => {
+            setResult('#reverse-text-result', textFrom('#reverse-text-input').split('').reverse().join(''));
+          }),
+        );
+        addCleanup(bindClear('reverse-text-clear', [{ selector: '#reverse-text-input' }, { selector: '#reverse-text-result', type: 'innerHTML' }]));
+        break;
+      case 'duplicate-line-remover':
+        addCleanup(
+          bindAction('duplicate-line-remover-action', () => {
+            const lines = textFrom('#duplicate-line-remover-input').split(/\r?\n/);
+            const clean = [...new Set(lines.filter((line) => line.trim() !== ''))];
+            setResult('#duplicate-line-remover-result', clean.join('\n'));
+          }),
+        );
+        addCleanup(bindClear('duplicate-line-remover-clear', [{ selector: '#duplicate-line-remover-input' }, { selector: '#duplicate-line-remover-result', type: 'innerHTML' }]));
+        break;
+      case 'find-and-replace':
+        addCleanup(
+          bindAction('find-and-replace-action', () => {
+            const input = textFrom('#find-and-replace-input');
+            const find = document.getElementById('find-and-replace-find')?.value || '';
+            const replace = document.getElementById('find-and-replace-replace')?.value || '';
+            setResult('#find-and-replace-result', input.replaceAll(find, replace));
+          }),
+        );
+        addCleanup(bindClear('find-and-replace-clear', [{ selector: '#find-and-replace-input' }, { selector: '#find-and-replace-find' }, { selector: '#find-and-replace-replace' }, { selector: '#find-and-replace-result', type: 'innerHTML' }]));
+        break;
+      case 'text-to-slug':
+        addCleanup(
+          bindAction('text-to-slug-action', () => {
+            const value = textFrom('#text-to-slug-input');
+            const slug = value
+              .toLowerCase()
+              .trim()
+              .normalize('NFKD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9\s-]/g, '')
+              .trim()
+              .replace(/\s+/g, '-')
+              .replace(/-+/g, '-');
+            setResult('#text-to-slug-result', slug || 'your-slug-here');
+          }),
+        );
+        addCleanup(bindClear('text-to-slug-clear', [{ selector: '#text-to-slug-input' }, { selector: '#text-to-slug-result', type: 'innerHTML' }]));
+        break;
+      case 'email-extractor':
+        addCleanup(
+          bindAction('email-extractor-action', () => {
+            const matches = [...new Set((textFrom('#email-extractor-input').match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || []))];
+            setResult('#email-extractor-result', matches.length ? matches.join('\n') : 'No email addresses found');
+          }),
+        );
+        addCleanup(bindClear('email-extractor-clear', [{ selector: '#email-extractor-input' }, { selector: '#email-extractor-result', type: 'innerHTML' }]));
+        break;
+      case 'random-text-sample':
+        addCleanup(
+          bindAction('random-text-sample-action', () => {
+            const choices = [
+              'Strategic planning is critical when building durable workflows and sustainable products.',
+              'The most reliable systems are simple to understand, easy to adjust, and consistent in use.',
+              'Strong communication reduces friction and keeps teams aligned around shared goals.',
+              'Efficient documentation helps teams move faster without losing clarity or trust.',
+            ];
+            const seed = textFrom('#random-text-sample-input').trim();
+            const value = seed ? `${seed}\n\n${choices[Math.floor(Math.random() * choices.length)]}` : choices[Math.floor(Math.random() * choices.length)];
+            setResult('#random-text-sample-result', value);
+          }),
+        );
+        addCleanup(bindClear('random-text-sample-clear', [{ selector: '#random-text-sample-input' }, { selector: '#random-text-sample-result', type: 'innerHTML' }]));
+        break;
+      case 'readability-score':
+        addCleanup(
+          bindAction('readability-score-action', () => {
+            const text = textFrom('#readability-score-input');
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const sentences = text.split(/[.!?]+/).filter(Boolean).length || 1;
+            const syllables = (text.toLowerCase().match(/[aeiouy]+/g) || []).length;
+            const score = words === 0 ? 0 : 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words);
+            setResult('#readability-score-result', `Estimated Flesch reading ease: ${score.toFixed(1)}`);
+          }),
+        );
+        addCleanup(bindClear('readability-score-clear', [{ selector: '#readability-score-input' }, { selector: '#readability-score-result', type: 'innerHTML' }]));
+        break;
+      case 'sentence-counter':
+        addCleanup(
+          bindAction('sentence-counter-action', () => {
+            const value = textFrom('#sentence-counter-input');
+            const sentences = value.split(/[.!?]+/).filter((sentence) => sentence.trim().length > 0).length;
+            setResult('#sentence-counter-result', `Sentences: ${sentences}\nWords: ${(value.match(/\b\w+\b/g) || []).length}\nCharacters: ${value.length}`);
+          }),
+        );
+        addCleanup(bindClear('sentence-counter-clear', [{ selector: '#sentence-counter-input' }, { selector: '#sentence-counter-result', type: 'innerHTML' }]));
+        break;
+      case 'json-formatter':
+        addCleanup(
+          bindAction('json-formatter-action', () => {
+            try {
+              const parsed = JSON.parse(textFrom('#json-formatter-input'));
+              setResult('#json-formatter-result', JSON.stringify(parsed, null, 2));
+            } catch {
+              setResult('#json-formatter-result', 'Invalid JSON');
+            }
+          }),
+        );
+        addCleanup(bindClear('json-formatter-clear', [{ selector: '#json-formatter-input' }, { selector: '#json-formatter-result', type: 'innerHTML' }]));
+        break;
+      case 'json-validator':
+        addCleanup(
+          bindAction('json-validator-action', () => {
+            try {
+              JSON.parse(textFrom('#json-validator-input'));
+              setResult('#json-validator-result', 'Valid JSON');
+            } catch {
+              setResult('#json-validator-result', 'Invalid JSON');
+            }
+          }),
+        );
+        addCleanup(bindClear('json-validator-clear', [{ selector: '#json-validator-input' }, { selector: '#json-validator-result', type: 'innerHTML' }]));
+        break;
+      case 'url-parser':
+        addCleanup(
+          bindAction('url-parser-action', () => {
+            try {
+              const url = new URL(textFrom('#url-parser-input'));
+              const result = [
+                `Protocol: ${url.protocol}`,
+                `Host: ${url.host}`,
+                `Hostname: ${url.hostname}`,
+                `Path: ${url.pathname}`,
+                `Query: ${url.search || '(none)'}`,
+                `Hash: ${url.hash || '(none)'}`,
+              ].join('\n');
+              setResult('#url-parser-result', result);
+            } catch {
+              setResult('#url-parser-result', 'Please enter a valid URL');
+            }
+          }),
+        );
+        addCleanup(bindClear('url-parser-clear', [{ selector: '#url-parser-input' }, { selector: '#url-parser-result', type: 'innerHTML' }]));
+        break;
+      case 'hex-color-tool':
+        addCleanup(
+          bindAction('hex-color-tool-action', () => {
+            const value = textFrom('#hex-color-tool-input').trim();
+            const match = value.match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+            if (!match) {
+              setResult('#hex-color-tool-result', 'Enter a valid hex color like #2563eb');
+              return;
+            }
+            const hex = match[1].length === 3 ? match[1].split('').map((c) => c + c).join('') : match[1];
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            const rgb = `rgb(${r}, ${g}, ${b})`;
+            setResult('#hex-color-tool-result', `${rgb}\nHex: #${hex.toUpperCase()}`);
+            const swatch = document.getElementById('hex-color-tool-swatch');
+            if (swatch) swatch.style.background = `#${hex}`;
+          }),
+        );
+        addCleanup(bindClear('hex-color-tool-clear', [{ selector: '#hex-color-tool-input' }, { selector: '#hex-color-tool-result', type: 'innerHTML' }, { selector: '#hex-color-tool-swatch', type: 'innerHTML' }]));
+        break;
+      case 'css-beautifier':
+        addCleanup(
+          bindAction('css-beautifier-action', () => {
+            const value = textFrom('#css-beautifier-input');
+            const easy = value.replace(/\s*\{\s*/g, ' {\n  ').replace(/;\s*/g, ';\n  ').replace(/\s*\}\s*/g, '\n}\n');
+            setResult('#css-beautifier-result', easy.trim());
+          }),
+        );
+        addCleanup(bindClear('css-beautifier-clear', [{ selector: '#css-beautifier-input' }, { selector: '#css-beautifier-result', type: 'innerHTML' }]));
+        break;
+      case 'base-converter':
+        addCleanup(
+          bindAction('base-converter-action', () => {
+            const value = textFrom('#base-converter-input');
+            const target = document.getElementById('base-converter-target')?.value || 'decimal';
+            try {
+              const parseValue = (source) => {
+                if (source === 'decimal') return Number(value);
+                if (source === 'binary') return parseInt(value, 2);
+                if (source === 'hex') return parseInt(value.replace(/^0x/, ''), 16);
+                return Number(value);
+              };
+              const num = parseValue('decimal');
+              let result = '';
+              if (target === 'binary') result = num.toString(2);
+              else if (target === 'hex') result = `0x${num.toString(16)}`;
+              else result = String(num);
+              setResult('#base-converter-result', result);
+            } catch {
+              setResult('#base-converter-result', 'Invalid input');
+            }
+          }),
+        );
+        addCleanup(bindClear('base-converter-clear', [{ selector: '#base-converter-input' }, { selector: '#base-converter-result', type: 'innerHTML' }]));
+        break;
+      case 'uuid-generator':
+        addCleanup(
+          bindAction('uuid-generator-action', () => {
+            const value = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = Math.random() * 16 | 0;
+              const v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+            setResult('#uuid-generator-result', value);
+          }),
+        );
+        addCleanup(bindClear('uuid-generator-clear', [{ selector: '#uuid-generator-result', type: 'innerHTML' }]));
+        break;
+      case 'sha256-hash':
+        addCleanup(
+          bindAction('sha256-hash-action', async () => {
+            const text = textFrom('#sha256-hash-input');
+            const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+            const bytes = Array.from(new Uint8Array(hash));
+            const hex = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+            setResult('#sha256-hash-result', hex);
+          }),
+        );
+        addCleanup(bindClear('sha256-hash-clear', [{ selector: '#sha256-hash-input' }, { selector: '#sha256-hash-result', type: 'innerHTML' }]));
+        break;
+      case 'regex-tester':
+        addCleanup(
+          bindAction('regex-tester-action', () => {
+            const patternInput = document.getElementById('regex-tester-pattern');
+            const source = textFrom('#regex-tester-input');
+            try {
+              const regex = new RegExp(patternInput?.value || '', 'g');
+              const matches = Array.from(source.matchAll(regex)).map((match) => match[0]);
+              setResult('#regex-tester-result', matches.length ? matches.join(', ') : 'No matches');
+            } catch {
+              setResult('#regex-tester-result', 'Invalid regex pattern');
+            }
+          }),
+        );
+        addCleanup(bindClear('regex-tester-clear', [{ selector: '#regex-tester-input' }, { selector: '#regex-tester-pattern' }, { selector: '#regex-tester-result', type: 'innerHTML' }]));
+        break;
+      case 'markdown-preview':
+        addCleanup(
+          bindAction('markdown-preview-action', () => {
+            const text = textFrom('#markdown-preview-input');
+            const html = text
+              .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.+?)\*/g, '<em>$1</em>')
+              .replace(/`(.+?)`/g, '<code>$1</code>')
+              .replace(/\n/g, '<br />');
+            const output = document.getElementById('markdown-preview-result');
+            if (output) output.innerHTML = html || 'Preview appears here';
+          }),
+        );
+        addCleanup(bindClear('markdown-preview-clear', [{ selector: '#markdown-preview-input' }, { selector: '#markdown-preview-result', type: 'innerHTML' }]));
+        break;
+      case 'average-calculator':
+        addCleanup(
+          bindAction('average-calculator-action', () => {
+            const numbers = textFrom('#average-calculator-values').split(',').map((part) => Number(part.trim())).filter((n) => Number.isFinite(n));
+            const result = numbers.length ? numbers.reduce((sum, n) => sum + n, 0) / numbers.length : 0;
+            setResult('#average-calculator-result', result.toFixed(2));
+          }),
+        );
+        break;
+      case 'percentage-difference':
+        addCleanup(
+          bindAction('percentage-difference-action', () => {
+            const a = Number(document.getElementById('percentage-difference-a')?.value || 0);
+            const b = Number(document.getElementById('percentage-difference-b')?.value || 0);
+            const diff = b === 0 ? 0 : ((b - a) / a) * 100;
+            setResult('#percentage-difference-result', `${diff.toFixed(2)}%`);
+          }),
+        );
+        break;
+      case 'compound-interest':
+        addCleanup(
+          bindAction('compound-interest-action', () => {
+            const principal = Number(document.getElementById('compound-interest-principal')?.value || 0);
+            const rate = Number(document.getElementById('compound-interest-rate')?.value || 0) / 100;
+            const years = Number(document.getElementById('compound-interest-years')?.value || 0);
+            const periods = Number(document.getElementById('compound-interest-periods')?.value || 12);
+            const value = principal * (1 + rate / periods) ** (periods * years);
+            setResult('#compound-interest-result', `$${value.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'loan-calculator':
+        addCleanup(
+          bindAction('loan-calculator-action', () => {
+            const amount = Number(document.getElementById('loan-calculator-amount')?.value || 0);
+            const rate = Number(document.getElementById('loan-calculator-rate')?.value || 0) / 100 / 12;
+            const months = Number(document.getElementById('loan-calculator-months')?.value || 0);
+            const payment = rate === 0 ? amount / months : (amount * rate) / (1 - (1 + rate) ** -months);
+            setResult('#loan-calculator-result', `$${payment.toFixed(2)}/mo`);
+          }),
+        );
+        break;
+      case 'fraction-simplifier':
+        addCleanup(
+          bindAction('fraction-simplifier-action', () => {
+            const numerator = Number(document.getElementById('fraction-simplifier-numerator')?.value || 0);
+            const denominator = Number(document.getElementById('fraction-simplifier-denominator')?.value || 1);
+            const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+            const div = gcd(Math.abs(numerator), Math.abs(denominator));
+            setResult('#fraction-simplifier-result', `${numerator / div}/${denominator / div}`);
+          }),
+        );
+        break;
+      case 'quadratic-solver':
+        addCleanup(
+          bindAction('quadratic-solver-action', () => {
+            const a = Number(document.getElementById('quadratic-solver-a')?.value || 0);
+            const b = Number(document.getElementById('quadratic-solver-b')?.value || 0);
+            const c = Number(document.getElementById('quadratic-solver-c')?.value || 0);
+            const disc = b * b - 4 * a * c;
+            if (disc < 0) {
+              setResult('#quadratic-solver-result', 'No real roots');
+              return;
+            }
+            const root1 = (-b + Math.sqrt(disc)) / (2 * a);
+            const root2 = (-b - Math.sqrt(disc)) / (2 * a);
+            setResult('#quadratic-solver-result', `x₁ = ${root1.toFixed(2)}, x₂ = ${root2.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'prime-checker':
+        addCleanup(
+          bindAction('prime-checker-action', () => {
+            const n = Number(document.getElementById('prime-checker-value')?.value || 0);
+            if (n < 2) {
+              setResult('#prime-checker-result', 'Not prime');
+              return;
+            }
+            let prime = true;
+            for (let i = 2; i <= Math.sqrt(n); i += 1) {
+              if (n % i === 0) prime = false;
+            }
+            setResult('#prime-checker-result', prime ? 'Prime' : 'Not prime');
+          }),
+        );
+        break;
+      case 'factorial-calculator':
+        addCleanup(
+          bindAction('factorial-calculator-action', () => {
+            let n = Number(document.getElementById('factorial-calculator-value')?.value || 0);
+            if (n < 0 || !Number.isInteger(n)) {
+              setResult('#factorial-calculator-result', 'Use a non-negative integer');
+              return;
+            }
+            let result = 1;
+            for (let i = 2; i <= n; i += 1) result *= i;
+            setResult('#factorial-calculator-result', String(result));
+          }),
+        );
+        break;
+      case 'random-number-generator':
+        addCleanup(
+          bindAction('random-number-generator-action', () => {
+            const min = Number(document.getElementById('random-number-generator-min')?.value || 0);
+            const max = Number(document.getElementById('random-number-generator-max')?.value || 100);
+            const value = min + Math.random() * (max - min);
+            setResult('#random-number-generator-result', value.toFixed(2));
+          }),
+        );
+        break;
+      case 'arithmetic-sequence':
+        addCleanup(
+          bindAction('arithmetic-sequence-action', () => {
+            const start = Number(document.getElementById('arithmetic-sequence-start')?.value || 0);
+            const diff = Number(document.getElementById('arithmetic-sequence-diff')?.value || 1);
+            const terms = Number(document.getElementById('arithmetic-sequence-terms')?.value || 5);
+            const values = Array.from({ length: terms }, (_, index) => start + index * diff);
+            setResult('#arithmetic-sequence-result', values.join(', '));
+          }),
+        );
+        break;
+      case 'roi-calculator':
+        addCleanup(
+          bindAction('roi-calculator-action', () => {
+            const investment = Number(document.getElementById('roi-calculator-investment')?.value || 0);
+            const final = Number(document.getElementById('roi-calculator-final')?.value || 0);
+            const roi = investment === 0 ? 0 : ((final - investment) / investment) * 100;
+            setResult('#roi-calculator-result', `${roi.toFixed(2)}%`);
+          }),
+        );
+        break;
+      case 'discount-calculator':
+        addCleanup(
+          bindAction('discount-calculator-action', () => {
+            const price = Number(document.getElementById('discount-calculator-price')?.value || 0);
+            const discount = Number(document.getElementById('discount-calculator-discount')?.value || 0);
+            const finalPrice = price * (1 - discount / 100);
+            setResult('#discount-calculator-result', `$${finalPrice.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'emi-calculator':
+        addCleanup(
+          bindAction('emi-calculator-action', () => {
+            const amount = Number(document.getElementById('emi-calculator-amount')?.value || 0);
+            const rate = Number(document.getElementById('emi-calculator-rate')?.value || 0) / 12 / 100;
+            const months = Number(document.getElementById('emi-calculator-months')?.value || 0);
+            const emi = rate === 0 ? amount / months : (amount * rate) / (1 - Math.pow(1 + rate, -months));
+            setResult('#emi-calculator-result', `$${emi.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'tax-estimator':
+        addCleanup(
+          bindAction('tax-estimator-action', () => {
+            const amount = Number(document.getElementById('tax-estimator-amount')?.value || 0);
+            const rate = Number(document.getElementById('tax-estimator-rate')?.value || 0) / 100;
+            const tax = amount * rate;
+            setResult('#tax-estimator-result', `$${tax.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'currency-converter':
+        addCleanup(
+          bindAction('currency-converter-action', () => {
+            const amount = Number(document.getElementById('currency-converter-amount')?.value || 0);
+            const rate = Number(document.getElementById('currency-converter-rate')?.value || 1);
+            setResult('#currency-converter-result', `${(amount * rate).toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'net-salary-calculator':
+        addCleanup(
+          bindAction('net-salary-calculator-action', () => {
+            const gross = Number(document.getElementById('net-salary-calculator-gross')?.value || 0);
+            const tax = Number(document.getElementById('net-salary-calculator-tax')?.value || 0) / 100;
+            const deductions = Number(document.getElementById('net-salary-calculator-deductions')?.value || 0);
+            const net = gross * (1 - tax) - deductions;
+            setResult('#net-salary-calculator-result', `$${net.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'future-value-calculator':
+        addCleanup(
+          bindAction('future-value-calculator-action', () => {
+            const present = Number(document.getElementById('future-value-calculator-present')?.value || 0);
+            const rate = Number(document.getElementById('future-value-calculator-rate')?.value || 0) / 100;
+            const years = Number(document.getElementById('future-value-calculator-years')?.value || 0);
+            const future = present * (1 + rate) ** years;
+            setResult('#future-value-calculator-result', `$${future.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'break-even-calculator':
+        addCleanup(
+          bindAction('break-even-calculator-action', () => {
+            const fixedCosts = Number(document.getElementById('break-even-calculator-fixed')?.value || 0);
+            const variable = Number(document.getElementById('break-even-calculator-variable')?.value || 0);
+            const price = Number(document.getElementById('break-even-calculator-price')?.value || 0);
+            const units = price > variable ? fixedCosts / (price - variable) : 0;
+            setResult('#break-even-calculator-result', `${units.toFixed(0)} units`);
+          }),
+        );
+        break;
+      case 'inflation-adjuster':
+        addCleanup(
+          bindAction('inflation-adjuster-action', () => {
+            const amount = Number(document.getElementById('inflation-adjuster-amount')?.value || 0);
+            const rate = Number(document.getElementById('inflation-adjuster-rate')?.value || 0) / 100;
+            const years = Number(document.getElementById('inflation-adjuster-years')?.value || 0);
+            const adjusted = amount * (1 + rate) ** years;
+            setResult('#inflation-adjuster-result', `$${adjusted.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'monthly-budget-planner':
+        addCleanup(
+          bindAction('monthly-budget-planner-action', () => {
+            const income = Number(document.getElementById('monthly-budget-planner-income')?.value || 0);
+            const essentials = Number(document.getElementById('monthly-budget-planner-essentials')?.value || 0);
+            const savings = Number(document.getElementById('monthly-budget-planner-savings')?.value || 0);
+            const remaining = income - essentials - savings;
+            setResult('#monthly-budget-planner-result', `Remaining: $${remaining.toFixed(2)}`);
+          }),
+        );
+        break;
+      case 'days-between-dates':
+        addCleanup(
+          bindAction('days-between-dates-action', () => {
+            const start = document.getElementById('days-between-dates-start')?.value;
+            const end = document.getElementById('days-between-dates-end')?.value;
+            if (!start || !end) {
+              setResult('#days-between-dates-result', 'Choose valid dates');
+              return;
+            }
+            const diff = Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
+            setResult('#days-between-dates-result', `${diff} days`);
+          }),
+        );
+        break;
+      case 'add-days':
+        addCleanup(
+          bindAction('add-days-action', () => {
+            const date = document.getElementById('add-days-date')?.value;
+            const days = Number(document.getElementById('add-days-days')?.value || 0);
+            if (!date) {
+              setResult('#add-days-result', 'Choose a date');
+              return;
+            }
+            const value = new Date(date);
+            value.setDate(value.getDate() + days);
+            setResult('#add-days-result', value.toISOString().slice(0, 10));
+          }),
+        );
+        break;
+      case 'timezone-converter':
+        addCleanup(
+          bindAction('timezone-converter-action', () => {
+            const time = document.getElementById('timezone-converter-time')?.value;
+            const offset = Number(document.getElementById('timezone-converter-offset')?.value || 0);
+            if (!time) {
+              setResult('#timezone-converter-result', 'Choose a time');
+              return;
+            }
+            const [hours, minutes] = time.split(':').map(Number);
+            const utcMinutes = hours * 60 + minutes - offset * 60;
+            const totalMinutes = ((utcMinutes % 1440) + 1440) % 1440;
+            const formatted = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+            setResult('#timezone-converter-result', `${formatted} UTC±${offset}`);
+          }),
+        );
+        break;
+      case 'countdown-timer':
+        addCleanup(
+          bindAction('countdown-timer-action', () => {
+            const date = document.getElementById('countdown-timer-date')?.value;
+            const time = document.getElementById('countdown-timer-time')?.value;
+            const output = document.getElementById('countdown-timer-result');
+            if (!date || !time || !output) return;
+            const target = new Date(`${date}T${time}`);
+            const update = () => {
+              const diff = target.getTime() - Date.now();
+              if (diff <= 0) {
+                output.textContent = 'Countdown complete';
+                return;
+              }
+              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+              const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+              const minutes = Math.floor((diff / (1000 * 60)) % 60);
+              const seconds = Math.floor((diff / 1000) % 60);
+              output.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+            };
+            update();
+            const interval = setInterval(update, 1000);
+            addCleanup(() => clearInterval(interval));
+          }),
+        );
+        break;
+      case 'day-of-year':
+        addCleanup(
+          bindAction('day-of-year-action', () => {
+            const date = document.getElementById('day-of-year-date')?.value;
+            if (!date) return;
+            const d = new Date(date);
+            const start = new Date(d.getFullYear(), 0, 0);
+            const diff = (d - start) / 1000 / 60 / 60 / 24;
+            setResult('#day-of-year-result', String(Math.floor(diff) + 1));
+          }),
+        );
+        break;
+      case 'weekday-finder':
+        addCleanup(
+          bindAction('weekday-finder-action', () => {
+            const date = document.getElementById('weekday-finder-date')?.value;
+            if (!date) return;
+            setResult('#weekday-finder-result', new Date(date).toLocaleDateString('en-US', { weekday: 'long' }));
+          }),
+        );
+        break;
+      case 'next-birthday':
+        addCleanup(
+          bindAction('next-birthday-action', () => {
+            const birth = document.getElementById('next-birthday-date')?.value;
+            if (!birth) return;
+            const dob = new Date(birth);
+            const now = new Date();
+            const next = new Date(now.getFullYear(), dob.getMonth(), dob.getDate());
+            if (next < now) next.setFullYear(now.getFullYear() + 1);
+            setResult('#next-birthday-result', next.toISOString().slice(0, 10));
+          }),
+        );
+        break;
+      case 'business-days':
+        addCleanup(
+          bindAction('business-days-action', () => {
+            const start = new Date(document.getElementById('business-days-start')?.value || 0);
+            const end = new Date(document.getElementById('business-days-end')?.value || 0);
+            let count = 0;
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const day = d.getDay();
+              if (day !== 0 && day !== 6) count += 1;
+            }
+            setResult('#business-days-result', `${count} business days`);
+          }),
+        );
+        break;
+      case 'time-ago':
+        addCleanup(
+          bindAction('time-ago-action', () => {
+            const date = new Date(document.getElementById('time-ago-date')?.value || Date.now());
+            const diff = Date.now() - date.getTime();
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            setResult('#time-ago-result', days > 0 ? `${days} days ago` : 'Today');
+          }),
+        );
+        break;
+      case 'age-in-days':
+        addCleanup(
+          bindAction('age-in-days-action', () => {
+            const birth = new Date(document.getElementById('age-in-days-date')?.value || Date.now());
+            const diff = Math.max(0, Date.now() - birth.getTime());
+            setResult('#age-in-days-result', `${Math.floor(diff / (1000 * 60 * 60 * 24))} days`);
+          }),
+        );
+        break;
+      case 'celsius-to-fahrenheit':
+        addCleanup(
+          bindAction('celsius-to-fahrenheit-action', () => {
+            const value = Number(document.getElementById('celsius-to-fahrenheit-celsius')?.value || 0);
+            setResult('#celsius-to-fahrenheit-result', `${((value * 9) / 5 + 32).toFixed(2)}°F`);
+          }),
+        );
+        break;
+      case 'fahrenheit-to-celsius':
+        addCleanup(
+          bindAction('fahrenheit-to-celsius-action', () => {
+            const value = Number(document.getElementById('fahrenheit-to-celsius-fahrenheit')?.value || 0);
+            setResult('#fahrenheit-to-celsius-result', `${((value - 32) * 5 / 9).toFixed(2)}°C`);
+          }),
+        );
+        break;
+      case 'cm-to-inches':
+        addCleanup(
+          bindAction('cm-to-inches-action', () => {
+            const value = Number(document.getElementById('cm-to-inches-value')?.value || 0);
+            setResult('#cm-to-inches-result', `${(value / 2.54).toFixed(2)} in`);
+          }),
+        );
+        break;
+      case 'inch-to-cm':
+        addCleanup(
+          bindAction('inch-to-cm-action', () => {
+            const value = Number(document.getElementById('inch-to-cm-value')?.value || 0);
+            setResult('#inch-to-cm-result', `${(value * 2.54).toFixed(2)} cm`);
+          }),
+        );
+        break;
+      case 'miles-to-km':
+        addCleanup(
+          bindAction('miles-to-km-action', () => {
+            const value = Number(document.getElementById('miles-to-km-value')?.value || 0);
+            setResult('#miles-to-km-result', `${(value * 1.60934).toFixed(2)} km`);
+          }),
+        );
+        break;
+      case 'km-to-miles':
+        addCleanup(
+          bindAction('km-to-miles-action', () => {
+            const value = Number(document.getElementById('km-to-miles-value')?.value || 0);
+            setResult('#km-to-miles-result', `${(value / 1.60934).toFixed(2)} mi`);
+          }),
+        );
+        break;
+      case 'bytes-to-mb':
+        addCleanup(
+          bindAction('bytes-to-mb-action', () => {
+            const value = Number(document.getElementById('bytes-to-mb-value')?.value || 0);
+            setResult('#bytes-to-mb-result', `${(value / 1024 / 1024).toFixed(4)} MB`);
+          }),
+        );
+        break;
+      case 'mb-to-bytes':
+        addCleanup(
+          bindAction('mb-to-bytes-action', () => {
+            const value = Number(document.getElementById('mb-to-bytes-value')?.value || 0);
+            setResult('#mb-to-bytes-result', `${(value * 1024 * 1024).toFixed(0)} bytes`);
+          }),
+        );
+        break;
+      case 'minutes-to-hours':
+        addCleanup(
+          bindAction('minutes-to-hours-action', () => {
+            const value = Number(document.getElementById('minutes-to-hours-value')?.value || 0);
+            setResult('#minutes-to-hours-result', `${(value / 60).toFixed(2)} hr`);
+          }),
+        );
+        break;
+      case 'hours-to-minutes':
+        addCleanup(
+          bindAction('hours-to-minutes-action', () => {
+            const value = Number(document.getElementById('hours-to-minutes-value')?.value || 0);
+            setResult('#hours-to-minutes-result', `${(value * 60).toFixed(2)} min`);
+          }),
+        );
+        break;
+      case 'random-name-generator':
+        addCleanup(
+          bindAction('random-name-generator-action', () => {
+            const names = ['Ava', 'Noah', 'Mila', 'Leo', 'Zoe', 'Mason', 'Ivy', 'Lucas'];
+            const surnames = ['Harper', 'Carter', 'Brooks', 'Stone', 'Lane', 'Reed', 'Foster', 'Wells'];
+            setResult('#random-name-generator-result', `${names[Math.floor(Math.random() * names.length)]} ${surnames[Math.floor(Math.random() * surnames.length)]}`);
+          }),
+        );
+        break;
+      case 'business-name-generator':
+        addCleanup(
+          bindAction('business-name-generator-action', () => {
+            const prefixes = ['North', 'Summit', 'Bright', 'Crest', 'Harbor', 'Peak'];
+            const suffixes = ['Works', 'Labs', 'Studio', 'Collective', 'Group', 'Co'];
+            setResult('#business-name-generator-result', `${prefixes[Math.floor(Math.random() * prefixes.length)]} ${suffixes[Math.floor(Math.random() * suffixes.length)]}`);
+          }),
+        );
+        break;
+      case 'color-palette-generator':
+        addCleanup(
+          bindAction('color-palette-generator-action', () => {
+            const palette = ['#2563eb', '#7c3aed', '#14b8a6', '#f59e0b', '#ef4444'];
+            setResult('#color-palette-generator-result', palette.join('  '));
+          }),
+        );
+        break;
+      case 'dummy-text-generator':
+        addCleanup(
+          bindAction('dummy-text-generator-action', () => {
+            const text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.';
+            setResult('#dummy-text-generator-result', text);
+          }),
+        );
+        break;
+      case 'passphrase-generator':
+        addCleanup(
+          bindAction('passphrase-generator-action', () => {
+            const words = ['amber', 'river', 'forest', 'light', 'cloud', 'stone', 'signal', 'garden'];
+            const phrase = Array.from({ length: 4 }, () => words[Math.floor(Math.random() * words.length)]).join('-');
+            setResult('#passphrase-generator-result', phrase);
+          }),
+        );
+        break;
+      case 'quote-generator':
+        addCleanup(
+          bindAction('quote-generator-action', () => {
+            const quotes = ['Focus on clarity, not volume.', 'Consistency compounds over time.', 'Good systems create quiet confidence.'];
+            setResult('#quote-generator-result', quotes[Math.floor(Math.random() * quotes.length)]);
+          }),
+        );
+        break;
+      case 'emoji-picker':
+        addCleanup(
+          bindAction('emoji-picker-action', () => {
+            const items = ['😀', '🚀', '✨', '💡', '🎯', '🔥'];
+            setResult('#emoji-picker-result', items.join(' '));
+          }),
+        );
+        break;
+      case 'slug-generator':
+        addCleanup(
+          bindAction('slug-generator-action', () => {
+            const text = document.getElementById('slug-generator-input')?.value || '';
+            const slug = text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            setResult('#slug-generator-result', slug || 'your-slug');
+          }),
+        );
+        break;
+      case 'tag-generator':
+        addCleanup(
+          bindAction('tag-generator-action', () => {
+            const topic = document.getElementById('tag-generator-input')?.value || 'marketing';
+            const tags = topic.split(/\s+/).slice(0, 5).map((word) => `#${word.toLowerCase()}`);
+            setResult('#tag-generator-result', tags.join(' '));
+          }),
+        );
+        break;
+      case 'idea-generator':
+        addCleanup(
+          bindAction('idea-generator-action', () => {
+            const ideas = ['AI onboarding assistant for small businesses', 'Smart expense journal for freelancers', 'Community event planner with local SEO insights'];
+            setResult('#idea-generator-result', ideas[Math.floor(Math.random() * ideas.length)]);
+          }),
+        );
+        break;
+      case 'password-strength-checker':
+        addCleanup(
+          bindAction('password-strength-checker-action', () => {
+            const value = textFrom('#password-strength-checker-input');
+            let score = 0;
+            if (value.length >= 8) score += 1;
+            if (/[A-Z]/.test(value)) score += 1;
+            if (/[0-9]/.test(value)) score += 1;
+            if (/[^A-Za-z0-9]/.test(value)) score += 1;
+            const labels = ['Very weak', 'Weak', 'Medium', 'Strong', 'Very strong'];
+            setResult('#password-strength-checker-result', labels[Math.min(score, labels.length - 1)]);
+          }),
+        );
+        break;
+      case 'xor-cipher':
+        addCleanup(
+          bindAction('xor-cipher-action', () => {
+            const value = textFrom('#xor-cipher-input');
+            const key = Number(document.getElementById('xor-cipher-key')?.value || 7);
+            const encoded = [...value].map((char) => String.fromCharCode(char.charCodeAt(0) ^ key)).join('');
+            setResult('#xor-cipher-result', encoded);
+          }),
+        );
+        break;
+      case 'rot13-converter':
+        addCleanup(
+          bindAction('rot13-converter-action', () => {
+            const value = textFrom('#rot13-converter-input');
+            const converted = value.replace(/[A-Za-z]/g, (char) => {
+              const offset = char <= 'Z' ? 65 : 97;
+              return String.fromCharCode(offset + ((char.charCodeAt(0) - offset + 13) % 26));
+            });
+            setResult('#rot13-converter-result', converted);
+          }),
+        );
+        break;
+      case 'md5-hash':
+        addCleanup(
+          bindAction('md5-hash-action', async () => {
+            const data = new TextEncoder().encode(textFrom('#md5-hash-input'));
+            const hashBuffer = await crypto.subtle.digest('MD5', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            setResult('#md5-hash-result', hashArray.map((b) => b.toString(16).padStart(2, '0')).join(''));
+          }),
+        );
+        break;
+      case 'sha1-hash':
+        addCleanup(
+          bindAction('sha1-hash-action', async () => {
+            const data = new TextEncoder().encode(textFrom('#sha1-hash-input'));
+            const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            setResult('#sha1-hash-result', hashArray.map((b) => b.toString(16).padStart(2, '0')).join(''));
+          }),
+        );
+        break;
+      case 'token-generator':
+        addCleanup(
+          bindAction('token-generator-action', () => {
+            const prefix = document.getElementById('token-generator-prefix')?.value || 'tok_';
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            const token = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+            setResult('#token-generator-result', `${prefix}${token}`);
+          }),
+        );
+        break;
+      case 'jwt-decoder':
+        addCleanup(
+          bindAction('jwt-decoder-action', () => {
+            const token = textFrom('#jwt-decoder-input');
+            try {
+              const [, payload] = token.split('.');
+              if (!payload) throw new Error('Invalid');
+              const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+              setResult('#jwt-decoder-result', JSON.stringify(decoded, null, 2));
+            } catch {
+              setResult('#jwt-decoder-result', 'Invalid JWT payload');
+            }
+          }),
+        );
+        break;
+      case 'hmac-demo':
+        addCleanup(
+          bindAction('hmac-demo-action', async () => {
+            const key = document.getElementById('hmac-demo-key')?.value || 'demo-key';
+            const message = textFrom('#hmac-demo-input');
+            const enc = new TextEncoder();
+            const cryptoKey = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message));
+            setResult('#hmac-demo-result', Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join(''));
+          }),
+        );
+        break;
+      case 'api-key-generator':
+        addCleanup(
+          bindAction('api-key-generator-action', () => {
+            const prefix = document.getElementById('api-key-generator-prefix')?.value || 'sk';
+            const value = Array.from({ length: 32 }, () => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.charAt(Math.floor(Math.random() * 62))).join('');
+            setResult('#api-key-generator-result', `${prefix}_${value}`);
+          }),
+        );
+        break;
+      case 'credit-card-luhn-check':
+        addCleanup(
+          bindAction('credit-card-luhn-check-action', () => {
+            const digits = textFrom('#credit-card-luhn-check-input').replace(/\s+/g, '');
+            let sum = 0;
+            let shouldDouble = false;
+            for (let i = digits.length - 1; i >= 0; i -= 1) {
+              let digit = Number(digits[i]);
+              if (shouldDouble) {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+              }
+              sum += digit;
+              shouldDouble = !shouldDouble;
+            }
+            setResult('#credit-card-luhn-check-result', `${sum % 10 === 0 ? 'Valid' : 'Invalid'} card number`);
+          }),
+        );
+        break;
+      case 'meta-tag-generator':
+        addCleanup(
+          bindAction('meta-tag-generator-action', () => {
+            const title = document.getElementById('meta-tag-generator-title')?.value || 'My Page';
+            const description = document.getElementById('meta-tag-generator-description')?.value || 'Description';
+            const keywords = document.getElementById('meta-tag-generator-keywords')?.value || 'keyword1, keyword2';
+            const result = `<title>${title}</title>\n<meta name="description" content="${description}" />\n<meta name="keywords" content="${keywords}" />`;
+            setResult('#meta-tag-generator-result', result);
+          }),
+        );
+        break;
+      case 'keyword-density-analyzer':
+        addCleanup(
+          bindAction('keyword-density-analyzer-action', () => {
+            const text = textFrom('#keyword-density-analyzer-input');
+            const words = text.toLowerCase().match(/\b[a-z0-9-]+\b/g) || [];
+            const freq = {};
+            words.forEach((word) => {
+              freq[word] = (freq[word] || 0) + 1;
+            });
+            const entries = Object.entries(freq).slice(0, 10).map(([word, count]) => `${word}: ${count}`).join('\n');
+            setResult('#keyword-density-analyzer-result', entries || 'No keywords found');
+          }),
+        );
+        break;
+      case 'canonical-url-builder':
+        addCleanup(
+          bindAction('canonical-url-builder-action', () => {
+            const host = document.getElementById('canonical-url-builder-host')?.value || 'https://www.ai90s.site';
+            const path = document.getElementById('canonical-url-builder-path')?.value || '/';
+            setResult('#canonical-url-builder-result', `${host.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`);
+          }),
+        );
+        break;
+      case 'robots-txt-generator':
+        addCleanup(
+          bindAction('robots-txt-generator-action', () => {
+            const sitemap = document.getElementById('robots-txt-generator-sitemap')?.value || 'https://www.ai90s.site/sitemap.xml';
+            const result = `User-agent: *\nAllow: /\nSitemap: ${sitemap}`;
+            setResult('#robots-txt-generator-result', result);
+          }),
+        );
+        break;
+      case 'open-graph-generator':
+        addCleanup(
+          bindAction('open-graph-generator-action', () => {
+            const title = document.getElementById('open-graph-generator-title')?.value || 'AI90s';
+            const description = document.getElementById('open-graph-generator-description')?.value || 'Product details';
+            const image = document.getElementById('open-graph-generator-image')?.value || 'https://www.ai90s.site/og-image.png';
+            const result = `<meta property="og:title" content="${title}" />\n<meta property="og:description" content="${description}" />\n<meta property="og:image" content="${image}" />`;
+            setResult('#open-graph-generator-result', result);
+          }),
+        );
+        break;
+      case 'schema-markup-generator':
+        addCleanup(
+          bindAction('schema-markup-generator-action', () => {
+            const name = document.getElementById('schema-markup-generator-name')?.value || 'Example Business';
+            const type = document.getElementById('schema-markup-generator-type')?.value || 'Organization';
+            const result = `{"@context": "https://schema.org", "@type": "${type}", "name": "${name}"}`;
+            setResult('#schema-markup-generator-result', result);
+          }),
+        );
+        break;
+      case 'title-length-checker':
+        addCleanup(
+          bindAction('title-length-checker-action', () => {
+            const title = textFrom('#title-length-checker-input');
+            const length = title.length;
+            const status = length <= 60 ? 'Good length' : length <= 70 ? 'Borderline' : 'Too long';
+            setResult('#title-length-checker-result', `${length} chars — ${status}`);
+          }),
+        );
+        break;
+      case 'description-length-checker':
+        addCleanup(
+          bindAction('description-length-checker-action', () => {
+            const description = textFrom('#description-length-checker-input');
+            const length = description.length;
+            const status = length <= 160 ? 'Good length' : 'Consider shortening';
+            setResult('#description-length-checker-result', `${length} chars — ${status}`);
+          }),
+        );
+        break;
+      case 'sitemap-url-generator':
+        addCleanup(
+          bindAction('sitemap-url-generator-action', () => {
+            const lines = (textFrom('#sitemap-url-generator-input') || '').split(/\n+/).filter(Boolean);
+            const urls = lines.map((line) => `https://www.ai90s.site${line.startsWith('/') ? line : `/${line}`}`);
+            setResult('#sitemap-url-generator-result', urls.join('\n') || 'Add page paths to generate URLs');
+          }),
+        );
+        break;
+      case 'keyword-planner':
+        addCleanup(
+          bindAction('keyword-planner-action', () => {
+            const words = (textFrom('#keyword-planner-input') || '').split(/\n+/).filter(Boolean);
+            const clusters = words.map((word) => word.trim().replace(/\s+/g, ' '));
+            setResult('#keyword-planner-result', clusters.join('\n'));
+          }),
+        );
+        break;
+      default:
+        break;
     }
 
-    if (slug === 'image-converter') {
-      const input = containerRef.current.querySelector('#img-conv-file');
-      const target = containerRef.current.querySelector('#img-conv-target');
-      const btn = containerRef.current.querySelector('#img-conv-btn');
-      const download = containerRef.current.querySelector('#img-conv-download');
-      const status = containerRef.current.querySelector('#img-conv-status');
-
-      const convert = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select an image.';
-          return;
-        }
-        const img = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          download.href = url;
-          download.download = `converted.${target.value === 'image/png' ? 'png' : 'jpg'}`;
-          download.classList.remove('hidden');
-          status.textContent = 'Converted.';
-        }, target.value, 0.92);
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'image-crop') {
-      const input = containerRef.current.querySelector('#img-crop-file');
-      const x = containerRef.current.querySelector('#img-crop-x');
-      const y = containerRef.current.querySelector('#img-crop-y');
-      const w = containerRef.current.querySelector('#img-crop-w');
-      const h = containerRef.current.querySelector('#img-crop-h');
-      const btn = containerRef.current.querySelector('#img-crop-btn');
-      const download = containerRef.current.querySelector('#img-crop-download');
-      const status = containerRef.current.querySelector('#img-crop-status');
-
-      const crop = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          status.textContent = 'Select an image.';
-          return;
-        }
-        const img = await createImageBitmap(file);
-        const cropX = Number(x.value) || 0;
-        const cropY = Number(y.value) || 0;
-        const cropW = Number(w.value) || 0;
-        const cropH = Number(h.value) || 0;
-
-        if (!cropW || !cropH) {
-          status.textContent = 'Enter crop width and height.';
-          return;
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = cropW;
-        canvas.height = cropH;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          download.href = url;
-          download.classList.remove('hidden');
-          status.textContent = 'Cropped image ready.';
-        }, 'image/png');
-      };
-
-      btn.addEventListener('click', crop);
-      return () => btn.removeEventListener('click', crop);
-    }
-
-    if (slug === 'dominant-color') {
-      const input = containerRef.current.querySelector('#img-color-file');
-      const btn = containerRef.current.querySelector('#img-color-btn');
-      const out = containerRef.current.querySelector('#img-color-result');
-
-      const extract = async () => {
-        const file = input.files?.[0];
-        if (!file) {
-          out.textContent = 'Select an image.';
-          return;
-        }
-
-        const img = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = 32;
-        canvas.height = 32;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, 32, 32);
-        const data = ctx.getImageData(0, 0, 32, 32).data;
-        const counts = {};
-
-        for (let i = 0; i < data.length; i += 4) {
-          const r = Math.round(data[i] / 16) * 16;
-          const g = Math.round(data[i + 1] / 16) * 16;
-          const b = Math.round(data[i + 2] / 16) * 16;
-          const key = `${r},${g},${b}`;
-          counts[key] = (counts[key] || 0) + 1;
-        }
-
-        const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '0,0,0';
-        const [r, g, b] = dominant.split(',').map(Number);
-        out.innerHTML = `
-          <div class="h-10 w-10 rounded border border-slate-200" style="background: rgb(${r}, ${g}, ${b});"></div>
-          <div class="text-sm">rgb(${r}, ${g}, ${b})</div>
-        `;
-      };
-
-      btn.addEventListener('click', extract);
-      return () => btn.removeEventListener('click', extract);
-    }
-
-    if (slug === 'image-thumbnail') {
-      const input = containerRef.current.querySelector('#img-thumb-file');
-      const size = containerRef.current.querySelector('#img-thumb-size');
-      const btn = containerRef.current.querySelector('#img-thumb-btn');
-      const out = containerRef.current.querySelector('#img-thumb-output');
-      const download = containerRef.current.querySelector('#img-thumb-download');
-
-      const gen = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        const img = await createImageBitmap(file);
-        const target = Number(size.value) || 150;
-        const canvas = document.createElement('canvas');
-        canvas.width = target;
-        canvas.height = target;
-        const ctx = canvas.getContext('2d');
-        const ratio = Math.max(target / img.width, target / img.height);
-        const newW = img.width * ratio;
-        const newH = img.height * ratio;
-        const x = (target - newW) / 2;
-        const y = (target - newH) / 2;
-        ctx.drawImage(img, x, y, newW, newH);
-        const url = canvas.toDataURL('image/png');
-        out.innerHTML = `<img src="${url}" class="max-w-full border border-slate-200 bg-white" />`;
-        download.href = url;
-        download.classList.remove('hidden');
-      };
-
-      btn.addEventListener('click', gen);
-      return () => btn.removeEventListener('click', gen);
-    }
-
-    if (slug === 'image-metadata') {
-      const input = containerRef.current.querySelector('#img-meta-file');
-      const btn = containerRef.current.querySelector('#img-meta-btn');
-      const out = containerRef.current.querySelector('#img-meta-output');
-
-      const show = () => {
-        const file = input.files?.[0];
-        if (!file) {
-          out.textContent = 'Select an image.';
-          return;
-        }
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = () => {
-          out.textContent = JSON.stringify({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            width: img.naturalWidth,
-            height: img.naturalHeight,
-          }, null, 2);
-          URL.revokeObjectURL(url);
-        };
-        img.src = url;
-      };
-
-      btn.addEventListener('click', show);
-      return () => btn.removeEventListener('click', show);
-    }
-
-    if (slug === 'image-grayscale') {
-      const input = containerRef.current.querySelector('#img-gray-file');
-      const btn = containerRef.current.querySelector('#img-gray-btn');
-      const out = containerRef.current.querySelector('#img-gray-output');
-      const download = containerRef.current.querySelector('#img-gray-download');
-
-      const apply = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        const img = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = data.data;
-
-        for (let i = 0; i < pixels.length; i += 4) {
-          const gray = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
-          pixels[i] = gray;
-          pixels[i + 1] = gray;
-          pixels[i + 2] = gray;
-        }
-
-        ctx.putImageData(data, 0, 0);
-        const url = canvas.toDataURL('image/png');
-        out.innerHTML = `<img src="${url}" class="max-w-full border border-slate-200 bg-white" />`;
-        download.href = url;
-        download.classList.remove('hidden');
-      };
-
-      btn.addEventListener('click', apply);
-      return () => btn.removeEventListener('click', apply);
-    }
-
-    // Calculator + converter batch
-    if (slug === 'loan-calculator') {
-      const p = containerRef.current.querySelector('#loan-principal');
-      const r = containerRef.current.querySelector('#loan-rate');
-      const y = containerRef.current.querySelector('#loan-years');
-      const btn = containerRef.current.querySelector('#loan-calc');
-      const monthly = containerRef.current.querySelector('#loan-monthly');
-      const total = containerRef.current.querySelector('#loan-total');
-
-      const calc = () => {
-        const principal = Number(p.value) || 0;
-        const rate = Number(r.value) || 0;
-        const years = Number(y.value) || 0;
-        if (principal <= 0 || years <= 0) {
-          monthly.textContent = '—';
-          total.textContent = '—';
-          return;
-        }
-        const monthlyRate = rate / 100 / 12;
-        const n = years * 12;
-        const payment = monthlyRate === 0 ? principal / n : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -n));
-        monthly.textContent = payment.toFixed(2);
-        total.textContent = (payment * n).toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'tip-calculator') {
-      const bill = containerRef.current.querySelector('#tip-bill');
-      const percent = containerRef.current.querySelector('#tip-percent');
-      const people = containerRef.current.querySelector('#tip-people');
-      const btn = containerRef.current.querySelector('#tip-calc');
-      const tip = containerRef.current.querySelector('#tip-amount');
-      const totalOut = containerRef.current.querySelector('#tip-total');
-      const per = containerRef.current.querySelector('#tip-per');
-
-      const calc = () => {
-        const b = Number(bill.value) || 0;
-        const p = Number(percent.value) || 0;
-        const peopleCount = Math.max(1, Number(people.value) || 1);
-        const tipAmount = (b * p) / 100;
-        const totalAmount = b + tipAmount;
-        tip.textContent = tipAmount.toFixed(2);
-        totalOut.textContent = totalAmount.toFixed(2);
-        per.textContent = (totalAmount / peopleCount).toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'compound-interest') {
-      const p = containerRef.current.querySelector('#ci-principal');
-      const r = containerRef.current.querySelector('#ci-rate');
-      const times = containerRef.current.querySelector('#ci-times');
-      const y = containerRef.current.querySelector('#ci-years');
-      const btn = containerRef.current.querySelector('#ci-calc');
-      const out = containerRef.current.querySelector('#ci-result');
-
-      const calc = () => {
-        const principal = Number(p.value) || 0;
-        const rate = Number(r.value) || 0;
-        const n = Math.max(1, Number(times.value) || 1);
-        const years = Number(y.value) || 0;
-        const value = principal * Math.pow(1 + rate / 100 / n, n * years);
-        out.textContent = value.toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'cagr-calculator') {
-      const start = containerRef.current.querySelector('#cagr-start');
-      const end = containerRef.current.querySelector('#cagr-end');
-      const years = containerRef.current.querySelector('#cagr-years');
-      const btn = containerRef.current.querySelector('#cagr-calc');
-      const out = containerRef.current.querySelector('#cagr-result');
-
-      const calc = () => {
-        const s = Number(start.value) || 0;
-        const e = Number(end.value) || 0;
-        const y = Number(years.value) || 0;
-        if (s <= 0 || y <= 0) {
-          out.textContent = 'Invalid inputs';
-          return;
-        }
-        const cagr = (Math.pow(e / s, 1 / y) - 1) * 100;
-        out.textContent = `${cagr.toFixed(2)}%`;
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'emi-calculator') {
-      const principal = containerRef.current.querySelector('#emi-principal');
-      const rate = containerRef.current.querySelector('#emi-rate');
-      const tenure = containerRef.current.querySelector('#emi-tenure');
-      const btn = containerRef.current.querySelector('#emi-calc');
-      const out = containerRef.current.querySelector('#emi-result');
-
-      const calc = () => {
-        const p = Number(principal.value) || 0;
-        const r = Number(rate.value) || 0;
-        const n = Number(tenure.value) || 0;
-        if (p <= 0 || n <= 0) {
-          out.textContent = 'Invalid inputs';
-          return;
-        }
-        const monthlyRate = r / 100 / 12;
-        const emi = monthlyRate === 0 ? p / n : (p * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -n));
-        out.textContent = emi.toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'discount-calculator') {
-      const original = containerRef.current.querySelector('#discount-original');
-      const percent = containerRef.current.querySelector('#discount-percent');
-      const btn = containerRef.current.querySelector('#discount-calc');
-      const finalOutput = containerRef.current.querySelector('#discount-final');
-      const saveOutput = containerRef.current.querySelector('#discount-saved');
-
-      const calc = () => {
-        const o = Number(original.value) || 0;
-        const p = Number(percent.value) || 0;
-        const saved = o * (p / 100);
-        finalOutput.textContent = (o - saved).toFixed(2);
-        saveOutput.textContent = saved.toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'simple-interest-calculator') {
-      const principal = containerRef.current.querySelector('#si-principal');
-      const rate = containerRef.current.querySelector('#si-rate');
-      const years = containerRef.current.querySelector('#si-years');
-      const btn = containerRef.current.querySelector('#si-calc');
-      const interest = containerRef.current.querySelector('#si-interest');
-      const total = containerRef.current.querySelector('#si-total');
-
-      const calc = () => {
-        const p = Number(principal.value) || 0;
-        const r = Number(rate.value) || 0;
-        const y = Number(years.value) || 0;
-        const si = (p * r * y) / 100;
-        interest.textContent = si.toFixed(2);
-        total.textContent = (p + si).toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'date-diff-calculator') {
-      const start = containerRef.current.querySelector('#dd-start');
-      const end = containerRef.current.querySelector('#dd-end');
-      const btn = containerRef.current.querySelector('#dd-calc');
-      const out = containerRef.current.querySelector('#dd-result');
-
-      const calc = () => {
-        if (!start.value || !end.value) {
-          out.textContent = 'Pick both dates';
-          return;
-        }
-        const diff = Math.ceil((new Date(end.value) - new Date(start.value)) / (1000 * 60 * 60 * 24));
-        out.textContent = `${diff} days`;
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'mortgage-calculator') {
-      const price = containerRef.current.querySelector('#mort-price');
-      const down = containerRef.current.querySelector('#mort-down');
-      const rate = containerRef.current.querySelector('#mort-rate');
-      const years = containerRef.current.querySelector('#mort-years');
-      const btn = containerRef.current.querySelector('#mort-calc');
-      const out = containerRef.current.querySelector('#mort-result');
-
-      const calc = () => {
-        const principal = Number(price.value) - Number(down.value || 0);
-        const r = (Number(rate.value) || 0) / 100 / 12;
-        const n = (Number(years.value) || 0) * 12;
-        if (principal <= 0 || n <= 0) {
-          out.textContent = 'Invalid inputs';
-          return;
-        }
-        const payment = r === 0 ? principal / n : (principal * r) / (1 - Math.pow(1 + r, -n));
-        out.textContent = payment.toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'fuel-cost-calculator') {
-      const distance = containerRef.current.querySelector('#fuel-distance');
-      const mpg = containerRef.current.querySelector('#fuel-mpg');
-      const price = containerRef.current.querySelector('#fuel-price');
-      const btn = containerRef.current.querySelector('#fuel-calc');
-      const out = containerRef.current.querySelector('#fuel-result');
-
-      const calc = () => {
-        const d = Number(distance.value) || 0;
-        const m = Number(mpg.value) || 0;
-        const p = Number(price.value) || 0;
-        if (m <= 0) {
-          out.textContent = 'Invalid fuel economy';
-          return;
-        }
-        out.textContent = ((d / m) * p).toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'unit-price-calculator') {
-      const total = containerRef.current.querySelector('#unit-total');
-      const qty = containerRef.current.querySelector('#unit-qty');
-      const btn = containerRef.current.querySelector('#unit-calc');
-      const out = containerRef.current.querySelector('#unit-result');
-
-      const calc = () => {
-        const t = Number(total.value) || 0;
-        const q = Number(qty.value) || 0;
-        if (q <= 0) {
-          out.textContent = 'Invalid quantity';
-          return;
-        }
-        out.textContent = (t / q).toFixed(2);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'savings-goal') {
-      const goal = containerRef.current.querySelector('#save-goal');
-      const current = containerRef.current.querySelector('#save-current');
-      const monthly = containerRef.current.querySelector('#save-monthly');
-      const rate = containerRef.current.querySelector('#save-rate');
-      const btn = containerRef.current.querySelector('#save-calc');
-      const out = containerRef.current.querySelector('#save-result');
-
-      const calc = () => {
-        const g = Number(goal.value) || 0;
-        const c = Number(current.value) || 0;
-        const m = Number(monthly.value) || 0;
-        const r = Number(rate.value) || 0;
-        if (g <= c || m <= 0) {
-          out.textContent = 'Invalid inputs';
-          return;
-        }
-        let balance = c;
-        let months = 0;
-        const monthlyRate = r / 100 / 12;
-        while (balance < g && months < 10000) {
-          balance = balance * (1 + monthlyRate) + m;
-          months += 1;
-        }
-        out.textContent = months === 10000 ? 'Not reached in 10000 months' : String(months);
-      };
-
-      btn.addEventListener('click', calc);
-      return () => btn.removeEventListener('click', calc);
-    }
-
-    if (slug === 'km-to-miles') {
-      const input = containerRef.current.querySelector('#km-input');
-      const btn = containerRef.current.querySelector('#km-convert');
-      const out = containerRef.current.querySelector('#km-result');
-
-      const convert = () => {
-        const km = Number(input.value) || 0;
-        out.textContent = (km * 0.621371).toFixed(2);
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'celsius-to-fahrenheit') {
-      const input = containerRef.current.querySelector('#temp-input');
-      const toF = containerRef.current.querySelector('#to-f');
-      const toC = containerRef.current.querySelector('#to-c');
-      const out = containerRef.current.querySelector('#temp-result');
-
-      const fCalc = () => {
-        const v = Number(input.value) || 0;
-        out.textContent = `Result: ${(v * 9) / 5 + 32} °F`;
-      };
-      const cCalc = () => {
-        const v = Number(input.value) || 0;
-        out.textContent = `Result: ${((v - 32) * 5) / 9} °C`;
-      };
-
-      toF.addEventListener('click', fCalc);
-      toC.addEventListener('click', cCalc);
-      return () => {
-        toF.removeEventListener('click', fCalc);
-        toC.removeEventListener('click', cCalc);
-      };
-    }
-
-    if (slug === 'bytes-to-human') {
-      const input = containerRef.current.querySelector('#bytes-input');
-      const btn = containerRef.current.querySelector('#bytes-convert');
-      const out = containerRef.current.querySelector('#bytes-result');
-
-      const convert = () => {
-        let bytes = Number(input.value) || 0;
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        let i = 0;
-        while (bytes >= 1024 && i < units.length - 1) {
-          bytes /= 1024;
-          i++;
-        }
-        out.textContent = `${bytes.toFixed(2)} ${units[i]}`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'hex-to-rgb') {
-      const input = containerRef.current.querySelector('#hex-input');
-      const btn = containerRef.current.querySelector('#hex-convert');
-      const out = containerRef.current.querySelector('#hex-result');
-
-      const convert = () => {
-        const value = (input.value || '').replace('#', '').trim();
-        if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(value)) {
-          out.textContent = 'Invalid hex color';
-          return;
-        }
-        const hex = value.length === 3 ? value.split('').map((c) => c + c).join('') : value;
-        const r = parseInt(hex.slice(0, 2), 16);
-        const g = parseInt(hex.slice(2, 4), 16);
-        const b = parseInt(hex.slice(4, 6), 16);
-        out.textContent = `rgb(${r}, ${g}, ${b})`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'rgb-to-hex') {
-      const r = containerRef.current.querySelector('#r-input');
-      const g = containerRef.current.querySelector('#g-input');
-      const b = containerRef.current.querySelector('#b-input');
-      const btn = containerRef.current.querySelector('#rgb-convert');
-      const out = containerRef.current.querySelector('#rgb-result');
-
-      const convert = () => {
-        const red = Number(r.value) || 0;
-        const green = Number(g.value) || 0;
-        const blue = Number(b.value) || 0;
-        if ([red, green, blue].some((v) => v < 0 || v > 255)) {
-          out.textContent = 'Enter values 0-255';
-          return;
-        }
-        const hex = '#' + [red, green, blue].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
-        out.textContent = hex;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'ms-to-time') {
-      const input = containerRef.current.querySelector('#ms-input');
-      const btn = containerRef.current.querySelector('#ms-convert');
-      const out = containerRef.current.querySelector('#ms-result');
-
-      const convert = () => {
-        const ms = Number(input.value) || 0;
-        const hours = Math.floor(ms / 3600000);
-        const minutes = Math.floor((ms % 3600000) / 60000);
-        const seconds = Math.floor((ms % 60000) / 1000);
-        out.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'minutes-to-hours') {
-      const input = containerRef.current.querySelector('#min-input');
-      const btn = containerRef.current.querySelector('#min-convert');
-      const out = containerRef.current.querySelector('#min-result');
-
-      const convert = () => {
-        const mins = Number(input.value) || 0;
-        const hours = Math.floor(mins / 60);
-        const remainder = mins % 60;
-        out.textContent = `${hours}h ${remainder}m`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'html-escape') {
-      const input = containerRef.current.querySelector('#html-input');
-      const output = containerRef.current.querySelector('#html-output');
-      const escBtn = containerRef.current.querySelector('#html-escape-btn');
-      const unBtn = containerRef.current.querySelector('#html-unescape-btn');
-
-      const escape = () => {
-        output.value = input.value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      };
-      const unescape = () => {
-        output.value = input.value.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      };
-
-      escBtn.addEventListener('click', escape);
-      unBtn.addEventListener('click', unescape);
-      return () => {
-        escBtn.removeEventListener('click', escape);
-        unBtn.removeEventListener('click', unescape);
-      };
-    }
-
-    if (slug === 'svg-to-dataurl') {
-      const input = containerRef.current.querySelector('#svg-input');
-      const btn = containerRef.current.querySelector('#svg-convert');
-      const out = containerRef.current.querySelector('#svg-output');
-
-      const convert = () => {
-        const svg = input.value.trim();
-        if (!svg) {
-          out.value = '';
-          return;
-        }
-        out.value = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'json-pretty') {
-      const input = containerRef.current.querySelector('#json-input');
-      const pretty = containerRef.current.querySelector('#json-pretty-btn');
-      const minify = containerRef.current.querySelector('#json-minify-btn');
-      const output = containerRef.current.querySelector('#json-output');
-
-      const prettyJson = () => {
-        try {
-          output.value = JSON.stringify(JSON.parse(input.value), null, 2);
-        } catch {
-          output.value = 'Invalid JSON';
-        }
-      };
-
-      const minifiedJson = () => {
-        try {
-          output.value = JSON.stringify(JSON.parse(input.value));
-        } catch {
-          output.value = 'Invalid JSON';
-        }
-      };
-
-      pretty.addEventListener('click', prettyJson);
-      minify.addEventListener('click', minifiedJson);
-      return () => {
-        pretty.removeEventListener('click', prettyJson);
-        minify.removeEventListener('click', minifiedJson);
-      };
-    }
-
-    if (slug === 'unix-timestamp') {
-      const tsInput = containerRef.current.querySelector('#ts-input');
-      const toDateBtn = containerRef.current.querySelector('#ts-to-date');
-      const dateInput = containerRef.current.querySelector('#date-input');
-      const toTsBtn = containerRef.current.querySelector('#date-to-ts');
-      const out = containerRef.current.querySelector('#ts-result');
-
-      const toDate = () => {
-        const ts = Number(tsInput.value) || 0;
-        out.textContent = `Result: ${new Date(ts * 1000).toISOString()}`;
-      };
-      const toTs = () => {
-        const value = new Date(dateInput.value).getTime() / 1000;
-        out.textContent = `Result: ${Math.floor(value)}`;
-      };
-
-      toDateBtn.addEventListener('click', toDate);
-      toTsBtn.addEventListener('click', toTs);
-      return () => {
-        toDateBtn.removeEventListener('click', toDate);
-        toTsBtn.removeEventListener('click', toTs);
-      };
-    }
-
-    if (slug === 'roman-numeral') {
-      const numInput = containerRef.current.querySelector('#roman-number');
-      const romanInput = containerRef.current.querySelector('#roman-input');
-      const toRomanBtn = containerRef.current.querySelector('#int-to-roman');
-      const toIntBtn = containerRef.current.querySelector('#roman-to-int');
-      const out = containerRef.current.querySelector('#roman-result');
-
-      const toRoman = () => {
-        const value = Number(numInput.value) || 0;
-        const map = [
-          [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
-          [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-        ];
-        let result = '';
-        let n = value;
-        for (const [num, symbol] of map) {
-          while (n >= num) {
-            result += symbol;
-            n -= num;
-          }
-        }
-        out.textContent = `Result: ${result || 'Invalid number'}`;
-      };
-
-      const toInt = () => {
-        const str = romanInput.value.trim();
-        const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
-        let total = 0;
-        for (let i = 0; i < str.length; i++) {
-          const current = map[str[i]] || 0;
-          const next = map[str[i + 1]] || 0;
-          total += current < next ? -current : current;
-        }
-        out.textContent = `Result: ${total}`;
-      };
-
-      toRomanBtn.addEventListener('click', toRoman);
-      toIntBtn.addEventListener('click', toInt);
-      return () => {
-        toRomanBtn.removeEventListener('click', toRoman);
-        toIntBtn.removeEventListener('click', toInt);
-      };
-    }
-
-    if (slug === 'fraction-to-decimal') {
-      const input = containerRef.current.querySelector('#frac-input');
-      const btn = containerRef.current.querySelector('#frac-convert');
-      const out = containerRef.current.querySelector('#frac-result');
-
-      const convert = () => {
-        const value = input.value.trim();
-        const [n, d] = value.split('/');
-        const numerator = Number(n);
-        const denominator = Number(d);
-        if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
-          out.textContent = 'Invalid fraction';
-          return;
-        }
-        out.textContent = (numerator / denominator).toString();
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'meters-to-feet') {
-      const input = containerRef.current.querySelector('#m-input');
-      const btn = containerRef.current.querySelector('#m-convert');
-      const out = containerRef.current.querySelector('#m-result');
-
-      const convert = () => {
-        const meters = Number(input.value) || 0;
-        out.textContent = (meters * 3.28084).toFixed(2);
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    if (slug === 'inches-to-cm') {
-      const input = containerRef.current.querySelector('#inch-input');
-      const btn = containerRef.current.querySelector('#inch-convert');
-      const out = containerRef.current.querySelector('#inch-result');
-
-      const convert = () => {
-        const inches = Number(input.value) || 0;
-        out.textContent = (inches * 2.54).toFixed(2);
-      };
-
-      btn.addEventListener('click', convert);
-      return () => btn.removeEventListener('click', convert);
-    }
-
-    return;
+    return () => {
+      cleanup.forEach((fn) => fn());
+    };
   }, [slug, html]);
 
-  return <div ref={containerRef} />;
+  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
 }

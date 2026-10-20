@@ -8,9 +8,7 @@ export default function sitemap() {
     .filter((tool) => tool && tool.slug)
     .map((tool) => `/tools/${tool.slug}`);
 
-  const routes = [...staticRoutes, ...toolRoutes];
-
-  return routes.map((route) => ({
+  return [...staticRoutes, ...toolRoutes].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
     changeFrequency: route === '/' ? 'weekly' : 'monthly',

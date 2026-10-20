@@ -2,6 +2,7 @@ import tools from '@/data/tools';
 import ToolGrid from '@/components/ToolGrid';
 
 const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort();
+const toolCount = tools.length;
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -24,7 +25,7 @@ export default function HomePage() {
         <div className="relative z-10 container mx-auto px-4 max-w-6xl">
           <div className="text-center">
             <span className="inline-block rounded-full bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-gray-700">
-              500+ tools
+              {toolCount} tools
             </span>
             <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 md:text-6xl">
               Multi-tool utility suite for everyday work
@@ -43,7 +44,7 @@ export default function HomePage() {
       <section className="container mx-auto max-w-6xl px-4 py-12">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">Featured tools</h2>
-          <span className="text-sm text-slate-500">{tools.length} tools ready</span>
+          <span className="text-sm text-slate-500">{toolCount} tools ready</span>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
