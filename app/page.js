@@ -1,17 +1,14 @@
 import tools from '@/data/tools';
-import ToolGrid from '@/components/ToolGrid';
-
-const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort();
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Multi-Tool Hub',
-  url: 'https://example.com',
+  url: 'https://www.ai90s.site',
   description: 'Modern online utility tools for productivity, SEO, finance, PDFs, images and developers.',
   potentialAction: {
     '@type': 'SearchAction',
-    target: 'https://example.com/?q={search_term_string}',
+    target: 'https://www.ai90s.site/?q={search_term_string}',
     'query-input': 'required name=search_term_string',
   },
 };

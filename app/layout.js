@@ -3,13 +3,16 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata = {
+  metadataBase: new URL('https://www.ai90s.site'),
   title: 'Multi-Tool Hub',
   description: 'A modern collection of online tools for productivity, finance, SEO, PDF, images, and development.',
-  metadataBase: new URL('https://example.com'),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Multi-Tool Hub',
     description: 'A modern collection of online tools for productivity, finance, SEO, PDF, images, and development.',
-    url: 'https://example.com',
+    url: 'https://www.ai90s.site',
     siteName: 'Multi-Tool Hub',
   },
 };
