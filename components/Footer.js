@@ -1,44 +1,64 @@
 import Link from 'next/link';
 import tools from '@/data/tools';
+import { categoryToSlug } from '@/lib/seo-data';
 
-const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort();
+const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort((a, b) => a.localeCompare(b));
 
 export default function Footer() {
   return (
-    <footer className="mt-16 border-t border-slate-200 bg-white">
-      <div className="container mx-auto max-w-6xl px-4 py-12">
+    <footer className="border-t border-slate-200 bg-slate-950 text-slate-200">
+      <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-                MT
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-lg font-black text-white">AI</div>
+              <div>
+                <div className="text-lg font-bold text-white">AI90s.site</div>
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Utility Studio</div>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Multi-Tool Hub</h3>
             </div>
-            <p className="max-w-sm text-sm text-slate-600">
-              A modern hub of utility tools built for text, finance, SEO, images, PDFs, and developer workflows.
+            <p className="max-w-md text-sm leading-6 text-slate-300">
+              AI90s.site brings together practical tools for writing, finance, SEO, image work, calculations, and everyday productivity.
             </p>
-            <p className="mt-4 text-xs text-slate-500">© {new Date().getFullYear()} Multi-Tool Hub</p>
+            <div className="mt-5 text-xs text-slate-400">© {new Date().getFullYear()} AI90s.site</div>
           </div>
 
-          {categories.slice(0, 4).map((category) => {
-            const categoryTools = tools.filter((tool) => tool.category === category).slice(0, 5);
+          <div>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Company</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              <li><Link href="/about" className="hover:text-white">About</Link></li>
+              <li><Link href="/contact" className="hover:text-white">Contact</Link></li>
+              <li><Link href="/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white">Terms</Link></li>
+              <li><Link href="/disclaimer" className="hover:text-white">Disclaimer</Link></li>
+            </ul>
+          </div>
 
-            return (
-              <div key={category}>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-700">{category}</h4>
-                <ul className="space-y-2 text-sm text-slate-600">
-                  {categoryTools.map((tool) => (
-                    <li key={tool.slug}>
-                      <Link href={`/tools/${tool.slug}`} className="hover:text-blue-600 hover:underline">
-                        {tool.title}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+          <div>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Categories</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              {categories.slice(0, 6).map((category) => (
+                <li key={category}>
+                  <Link href={`/categories/${categoryToSlug(category)}`} className="hover:text-white">{category}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Popular Tools</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              {['word-counter', 'qr-code-generator', 'password-generator', 'case-converter', 'percentage-calculator'].map((slug) => {
+                const tool = tools.find((item) => item.slug === slug);
+                if (!tool) return null;
+                return (
+                  <li key={tool.slug}>
+                    <Link href={`/tools/${tool.slug}`} className="hover:text-white">{tool.title}</Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       </div>
     </footer>
