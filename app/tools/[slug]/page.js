@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ToolRenderer from '@/components/ToolRenderer';
 import tools from '@/data/tools';
 import { getCategories, getCategoryRoute, getCategoryFromSlug, getToolBySlug, getToolMetadata, getCategoryMetadata, getCategoryRoute as getCategoryPath } from '@/lib/seo-data';
 
@@ -70,9 +71,9 @@ export default function ToolPage({ params }) {
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900">How it works</h2>
             <ol className="mt-4 space-y-3 text-sm text-slate-600">
-              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">1</span><span>Enter your source value or text in the available field.</span></li>
-              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">2</span><span>Review the output, validation messages, or generated result.</span></li>
-              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">3</span><span>Use the clear, reset, or copy action when you want to try another example.</span></li>
+              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">1</span><span>Enter your source material or key details.</span></li>
+              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">2</span><span>Review the output instantly in the tool interface.</span></li>
+              <li className="flex gap-3"><span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">3</span><span>Use the clear, practical result for your next step.</span></li>
             </ol>
           </div>
 
