@@ -1,62 +1,138 @@
+import Link from 'next/link';
 import tools from '@/data/tools';
-import ToolGrid from '@/components/ToolGrid';
+import { getCategories, getCategoryRoute, getToolBySlug, getHomeMetadata } from '@/lib/seo-data';
 
-const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort();
+const categories = getCategories();
 const toolCount = tools.length;
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'Multi-Tool Hub',
-  url: 'https://www.ai90s.site',
-  description: 'Modern online utility tools for productivity, SEO, finance, PDFs, images and developers.',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: 'https://www.ai90s.site/?q={search_term_string}',
-    'query-input': 'required name=search_term_string',
+export const metadata = {
+  title: 'AI90s.site | Online Utility Tools',
+  description: getHomeMetadata().description,
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'AI90s.site | Online Utility Tools',
+    description: getHomeMetadata().description,
+    url: 'https://www.ai90s.site/',
+    siteName: 'AI90s.site',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AI90s.site | Online Utility Tools',
+    description: getHomeMetadata().description,
   },
 };
 
 export default function HomePage() {
+  const topTools = tools.slice(0, 6);
+  const recentTools = tools.slice(-6);
+
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <section className="hero-gradient py-20 relative">
-        <div className="relative z-10 container mx-auto px-4 max-w-6xl">
-          <div className="text-center">
-            <span className="inline-block rounded-full bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-gray-700">
-              {toolCount} tools
-            </span>
-            <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 md:text-6xl">
-              Multi-tool utility suite for everyday work
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
-              Fast, useful tools for text, finance, SEO, PDFs, image editing, and developer workflows.
-            </p>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'AI90s.site', url: 'https://www.ai90s.site/', description: getHomeMetadata().description, potentialAction: { '@type': 'SearchAction', target: 'https://www.ai90s.site/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) }} />
+
+      <section className="hero-gradient relative overflow-hidden py-16 md:py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex rounded-full border border-blue-200 bg-white/80 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">{toolCount} tools</span>
+            <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 md:text-6xl">Professional tools for modern everyday work</h1>
+            <p className="mt-5 text-lg text-slate-600">Fast, reliable utilities for text, calculations, images, SEO, finance, PDF tasks, and professional productivity.</p>
           </div>
 
-          <div className="mx-auto mt-8 max-w-4xl">
-            <ToolGrid initialTools={tools} categories={categories} />
+          <div id="tool-search" className="mx-auto mt-8 max-w-5xl rounded-[28px] border border-slate-200 bg-white/90 p-4 shadow-[0_20px_60px_rgba(37,99,235,0.08)] backdrop-blur md:p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <label className="sr-only" htmlFor="tool-search-input">Search tools</label>
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">⌕</span>
+                <input id="tool-search-input" type="search" placeholder="Search tools, categories, or keywords" className="w-full rounded-full border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition focus:border-blue-600 focus:bg-white" />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">All</button>
+              {categories.map((category) => (
+                <Link key={category} href={getCategoryRoute(category)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">{category}</Link>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {topTools.map((tool) => (
+                <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card block rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-blue-200 hover:bg-white">
+                  <div className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-blue-700">{tool.category}</div>
+                  <h3 className="text-base font-semibold text-slate-900">{tool.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
+                  <div className="mt-4 inline-flex items-center text-sm font-medium text-blue-600">Open tool <span className="ml-2">→</span></div>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="container mx-auto max-w-6xl px-4 py-12">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-slate-900">Featured tools</h2>
-          <span className="text-sm text-slate-500">{toolCount} tools ready</span>
+      <section id="popular-tools" className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+        <div className="mb-8 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Popular tools</p>
+            <h2 className="mt-2 text-3xl font-bold text-slate-900">Most used utilities</h2>
+          </div>
+          <Link href="/#browse-categories" className="hidden text-sm font-medium text-blue-600 hover:underline md:inline-flex">Explore categories</Link>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {tools.slice(0, 6).map((tool) => (
-            <a key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card block rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:border-blue-200">
-              <div className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                {tool.category}
-              </div>
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {topTools.map((tool) => (
+            <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-blue-200">
+              <span className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">{tool.category}</span>
               <h3 className="text-xl font-semibold text-slate-900">{tool.title}</h3>
               <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
-            </a>
+            </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="bg-white py-12 md:py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-8 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Recently added</p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">Freshly published tools</h2>
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {recentTools.map((tool) => (
+              <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card rounded-2xl border border-slate-200 bg-slate-50 p-5 hover:border-blue-200 hover:bg-white">
+                <div className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">{tool.category}</div>
+                <h3 className="text-lg font-semibold text-slate-900">{tool.title}</h3>
+                <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="browse-categories" className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+        <div className="mb-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Browse by category</p>
+          <h2 className="mt-2 text-3xl font-bold text-slate-900">Find the right tool for the task</h2>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((category) => {
+            const categoryTools = tools.filter((tool) => tool.category === category).slice(0, 4);
+            return (
+              <Link key={category} href={getCategoryRoute(category)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-slate-900">{category}</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">{categoryTools.length} tools</span>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600">
+                  {categoryTools.map((tool) => (
+                    <div key={tool.slug}>{tool.title}</div>
+                  ))}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </>

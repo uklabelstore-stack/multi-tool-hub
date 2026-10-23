@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import tools from '@/data/tools';
-import { categoryToSlug } from '@/lib/seo-data';
+import { getCategories, getCategoryRoute } from '@/lib/seo-data';
 
-const categories = Array.from(new Set(tools.map((tool) => tool.category))).sort((a, b) => a.localeCompare(b));
+const categories = getCategories();
 
 export default function Footer() {
   return (
@@ -18,7 +18,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="max-w-md text-sm leading-6 text-slate-300">
-              AI90s.site brings together practical tools for writing, finance, SEO, image work, calculations, and everyday productivity.
+              AI90s.site brings together practical tools for writing, calculations, finance, SEO, and everyday productivity.
             </p>
             <div className="mt-5 text-xs text-slate-400">© {new Date().getFullYear()} AI90s.site</div>
           </div>
@@ -38,9 +38,7 @@ export default function Footer() {
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Categories</h3>
             <ul className="space-y-3 text-sm text-slate-300">
               {categories.slice(0, 6).map((category) => (
-                <li key={category}>
-                  <Link href={`/categories/${categoryToSlug(category)}`} className="hover:text-white">{category}</Link>
-                </li>
+                <li key={category}><Link href={getCategoryRoute(category)} className="hover:text-white">{category}</Link></li>
               ))}
             </ul>
           </div>
@@ -51,11 +49,7 @@ export default function Footer() {
               {['word-counter', 'qr-code-generator', 'password-generator', 'case-converter', 'percentage-calculator'].map((slug) => {
                 const tool = tools.find((item) => item.slug === slug);
                 if (!tool) return null;
-                return (
-                  <li key={tool.slug}>
-                    <Link href={`/tools/${tool.slug}`} className="hover:text-white">{tool.title}</Link>
-                  </li>
-                );
+                return <li key={tool.slug}><Link href={`/tools/${tool.slug}`} className="hover:text-white">{tool.title}</Link></li>;
               })}
             </ul>
           </div>
