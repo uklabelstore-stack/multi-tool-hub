@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://uklabelstore-stack.github.io/multi-tool-hub/sitemap.xml
