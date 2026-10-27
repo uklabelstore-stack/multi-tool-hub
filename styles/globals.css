@@ -1,168 +1,347 @@
-'use client';
-
 import Link from 'next/link';
-import { useState } from 'react';
 import tools from '@/data/tools';
-import { getCategories, getCategoryRoute } from '@/lib/seo-data';
-import '../styles/globals.css';
+import { getCategories, getCategoryRoute, getHomeMetadata } from '@/lib/seo-data';
 
 const categories = getCategories();
+const toolCount = tools.length;
 
 export const metadata = {
-  metadataBase: new URL('https://www.ai90s.site'),
   title: 'AI90s.site | Online Utility Tools',
-  description: 'AI90s.site brings together fast, practical tools for writing, calculations, finance, images, PDFs, SEO, and everyday productivity.',
+  description: getHomeMetadata().description,
   alternates: { canonical: '/' },
   openGraph: {
     title: 'AI90s.site | Online Utility Tools',
-    description: 'AI90s.site brings together fast, practical tools for writing, calculations, finance, images, PDFs, SEO, and everyday productivity.',
+    description: getHomeMetadata().description,
     url: 'https://www.ai90s.site/',
     siteName: 'AI90s.site',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AI90s.site | Online Utility Tools',
+    description: getHomeMetadata().description,
   },
 };
 
-export default function RootLayout({ children }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+export default function HomePage() {
+  const topTools = tools.slice(0, 6);
+  const recentTools = tools.slice(-6);
 
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-100 text-slate-900 antialiased">
-        <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur-xl">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between gap-4 py-3">
-              <Link href="/" className="flex items-center gap-3" aria-label="AI90s.site home page">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 text-sm font-black text-white shadow-lg shadow-blue-200">AI</div>
-                <div>
-                  <div className="text-lg font-black tracking-tight text-slate-900">AI90s.site</div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Utility Hub</div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'AI90s.site',
+            url: 'https://www.ai90s.site/',
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: 'https://www.ai90s.site/?q={search_term_string}',
+              'query-input': 'required name=search_term_string',
+            },
+          }),
+        }}
+      />
+
+      <section className="hero-gradient relative overflow-hidden py-16 md:py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex rounded-full border border-blue-200 bg-white/80 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+              {toolCount} tools
+            </span>
+            <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 md:text-6xl">
+              Professional tools for modern everyday work
+            </h1>
+            <p className="mt-5 text-lg text-slate-600">
+              Fast, reliable utilities for text, calculations, images, SEO, finance, PDF tasks, and professional productivity.
+            </p>
+          </div>
+
+          <div id="tool-search" className="mx-auto mt-8 max-w-5xl rounded-[28px] border border-slate-200 bg-white/90 p-4 shadow-[0_20px_60px_rgba(37,99,235,0.08)] backdrop-blur md:p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <label className="sr-only" htmlFor="tool-search-input">Search tools</label>
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">⌕</span>
+                <input
+                  id="tool-search-input"
+                  type="search"
+                  placeholder="Search tools, categories, or keywords"
+                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+                All
+              </button>
+              {categories.map((category) => (
+                <Link key={category} href={getCategoryRoute(category)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+                  {category}
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {topTools.map((tool) => (
+                <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card block rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-blue-200 hover:bg-white">
+                  <div className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-blue-700">
+                    {tool.category}
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-900">{tool.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
+                  <div className="mt-4 inline-flex items-center text-sm font-medium text-blue-600">
+                    Open tool <span className="ml-2">→</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="popular-tools" className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+        <div className="mb-8 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Popular tools</p>
+            <h2 className="mt-2 text-3xl font-bold text-slate-900">Most used utilities</h2>
+          </div>
+          <Link href="/#browse-categories" className="hidden text-sm font-medium text-blue-600 hover:underline md:inline-flex">
+            Explore categories
+          </Link>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {topTools.map((tool) => (
+            <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-blue-200">
+              <span className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                {tool.category}
+              </span>
+              <h3 className="text-xl font-semibold text-slate-900">{tool.title}</h3>
+              <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white py-12 md:py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-8 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Recently added</p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">Freshly published tools</h2>
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {recentTools.map((tool) => (
+              <Link key={tool.slug} href={`/tools/${tool.slug}`} className="tool-card rounded-2xl border border-slate-200 bg-slate-50 p-5 hover:border-blue-200 hover:bg-white">
+                <div className="mb-3 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                  {tool.category}
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">{tool.title}</h3>
+                <p className="mt-2 text-sm text-slate-600">{tool.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="browse-categories" className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+        <div className="mb-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">Browse by category</p>
+          <h2 className="mt-2 text-3xl font-bold text-slate-900">Find the right tool for the task</h2>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((category) => {
+            const categoryTools = tools.filter((tool) => tool.category === category).slice(0, 4);
+            return (
+              <Link key={category} href={getCategoryRoute(category)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold text-slate-900">{category}</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                    {categoryTools.length} tools
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600">
+                  {categoryTools.map((tool) => (
+                    <div key={tool.slug}>{tool.title}</div>
+                  ))}
                 </div>
               </Link>
-
-              <nav className="hidden items-center gap-6 lg:flex" aria-label="Main navigation">
-                <Link href="/" className="text-sm font-medium text-slate-700 transition hover:text-blue-600">Home</Link>
-                <div className="group relative">
-                  <button type="button" className="flex items-center gap-1 text-sm font-medium text-slate-700 transition hover:text-blue-600" aria-label="Open categories menu">
-                    Categories <span aria-hidden="true">▾</span>
-                  </button>
-                  <div className="invisible absolute left-0 top-full z-20 mt-3 min-w-[240px] rounded-2xl border border-slate-200 bg-white p-3 opacity-0 shadow-2xl transition-all duration-200 group-hover:visible group-hover:opacity-100">
-                    <div className="grid gap-1">
-                      {categories.map((category) => (
-                        <Link key={category} href={getCategoryRoute(category)} className="rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 hover:text-blue-600">
-                          {category}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <Link href="/#popular-tools" className="text-sm font-medium text-slate-700 transition hover:text-blue-600">Popular</Link>
-                <Link href="/#browse-categories" className="text-sm font-medium text-slate-700 transition hover:text-blue-600">Browse</Link>
-                <Link href="/about" className="text-sm font-medium text-slate-700 transition hover:text-blue-600">About</Link>
-              </nav>
-
-              <div className="hidden items-center gap-3 md:flex">
-                <div className="relative hidden xl:block">
-                  <input
-                    aria-label="Search tools"
-                    type="search"
-                    placeholder="Search tools"
-                    className="w-64 rounded-full border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                  />
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
-                </div>
-                <Link href="#tool-search" className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">
-                  Explore tools
-                </Link>
-              </div>
-
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
-                aria-label="Toggle navigation menu"
-                aria-expanded={isMenuOpen}
-                onClick={() => setIsMenuOpen((open) => !open)}
-              >
-                <span className="space-y-1.5">
-                  <span className="block h-0.5 w-5 rounded-full bg-slate-700" />
-                  <span className="block h-0.5 w-5 rounded-full bg-slate-700" />
-                  <span className="block h-0.5 w-5 rounded-full bg-slate-700" />
-                </span>
-              </button>
-            </div>
-
-            {isMenuOpen && (
-              <div className="border-t border-slate-200 bg-white py-4 lg:hidden">
-                <nav className="flex flex-col gap-3" aria-label="Mobile navigation">
-                  <Link href="/" className="rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>Home</Link>
-                  <Link href="/#popular-tools" className="rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>Popular</Link>
-                  <Link href="/#browse-categories" className="rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>Browse</Link>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Categories</div>
-                    <div className="grid gap-1">
-                      {categories.map((category) => (
-                        <Link key={category} href={getCategoryRoute(category)} className="rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-white hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>
-                          {category}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                  <Link href="/about" className="rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600" onClick={() => setIsMenuOpen(false)}>About</Link>
-                </nav>
-              </div>
-            )}
-          </div>
-        </header>
-
-        <main className="flex-1">{children}</main>
-
-        <footer className="border-t border-slate-200 bg-slate-950 text-slate-200">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
-              <div className="lg:col-span-2">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg font-black text-white shadow-lg shadow-blue-500/20">AI</div>
-                  <div>
-                    <div className="text-lg font-bold text-white">AI90s.site</div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Utility Studio</div>
-                  </div>
-                </div>
-                <p className="max-w-md text-sm leading-6 text-slate-300">AI90s.site brings together practical tools for writing, calculations, finance, SEO, PDFs, images, and everyday productivity in one clean workspace.</p>
-                <div className="mt-5 text-xs text-slate-400">© {new Date().getFullYear()} AI90s.site</div>
-              </div>
-
-              <div>
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Company</h3>
-                <ul className="space-y-3 text-sm text-slate-300">
-                  <li><Link href="/about" className="transition hover:text-white">About</Link></li>
-                  <li><Link href="/contact" className="transition hover:text-white">Contact</Link></li>
-                  <li><Link href="/privacy-policy" className="transition hover:text-white">Privacy Policy</Link></li>
-                  <li><Link href="/terms" className="transition hover:text-white">Terms</Link></li>
-                  <li><Link href="/disclaimer" className="transition hover:text-white">Disclaimer</Link></li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Categories</h3>
-                <ul className="space-y-3 text-sm text-slate-300">
-                  {categories.slice(0, 6).map((category) => (
-                    <li key={category}><Link href={getCategoryRoute(category)} className="transition hover:text-white">{category}</Link></li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">Popular Tools</h3>
-                <ul className="space-y-3 text-sm text-slate-300">
-                  {['word-counter', 'qr-code-generator', 'password-generator', 'case-converter', 'percentage-calculator'].map((slug) => {
-                    const tool = tools.find((item) => item.slug === slug);
-                    if (!tool) return null;
-                    return <li key={tool.slug}><Link href={`/tools/${tool.slug}`} className="transition hover:text-white">{tool.title}</Link></li>;
-                  })}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </footer>
-      </body>
-    </html>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
