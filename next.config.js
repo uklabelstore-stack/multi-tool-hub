@@ -7,12 +7,6 @@ module.exports = {
         destination: 'https://www.ai90s.site/:path*',
         permanent: true,
       },
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'www.ai90s.site' }],
-        destination: 'https://www.ai90s.site/:path*',
-        permanent: true,
-      },
     ];
   },
 };
